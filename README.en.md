@@ -1,6 +1,12 @@
-# LeRobot Marvin Force
+# LeRobot Marvin Force · ImplicitRDP
 
 [Chinese](README.md) | [English](README.en.md)
+
+> Standalone `implicitrdp` branch. Primary workspace: `workspaces/irdp`. Conda environment: `lerobot_marvin_implicitrdp`.
+>
+> The action latent, force-conditioned decoder, and visual diffusion objective are jointly optimized while retaining RDP's per-tick force response.
+>
+> This branch remains self-contained: environment setup, dataset audit, training, and physical rollout do not depend on another branch.
 
 A force-conditioned imitation-learning repository for the Marvin robot, based on LeRobot `0.6.1`. The `main` branch supports Force-conditioned ACT, Reactive Diffusion Policy (RDP), ImplicitRDP, and ForceVLA. It preserves the existing Marvin position-control rollout path, migrates policy deployment from `lerobot-record` to `lerobot-rollout`, and provides one-command entry points for environment setup, dataset audit, training, and deployment.
 

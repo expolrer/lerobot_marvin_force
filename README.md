@@ -1,6 +1,12 @@
-# LeRobot Marvin Force
+# LeRobot Marvin Force · ImplicitRDP
 
 [中文](README.md) | [English](README.en.md)
+
+> 当前为独立 `implicitrdp` 分支，主工作区是 `workspaces/irdp`，Conda 环境是 `lerobot_marvin_implicitrdp`。
+>
+> 在一个训练阶段联合优化动作 latent、力条件 decoder 和视觉 diffusion，并保留 RDP 的逐周期力反馈部署路径。
+>
+> 本分支独立包含环境配置、数据审查、训练和实机 rollout，不依赖其他分支。
 
 面向 Marvin 机械臂的力反馈模仿学习仓库，基于 LeRobot `0.6.1`，主分支完整支持 Force-conditioned ACT、Reactive Diffusion Policy（RDP）、ImplicitRDP 和 ForceVLA。仓库保留现有 Marvin 实际控制链路，把旧版 `lerobot-record + policy` 部署迁移到 `lerobot-rollout`，并统一提供环境、数据审查、训练、部署四个阶段的一键入口。
 
