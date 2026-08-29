@@ -1,0 +1,100 @@
+# 运行训练脚本时必须激活的 Conda 环境。
+environment_name: lerobot_marvin_forcevla
+
+# 启动训练前验证的数据集契约。
+dataset_contract:
+  # LeRobot v3.0 数据集根目录。
+  root: /home/marvin/hhw/peg_optical_module_0726force
+  # ForceVLA 必须存在的核心张量。
+  features:
+    # 当前 B 臂状态。
+    observation.state:
+      # 字段数据类型。
+      dtype: float32
+      # 七关节加夹爪的维度。
+      shape: [8]
+      # 状态通道的固定顺序。
+      names: [joint_1.pos, joint_2.pos, joint_3.pos, joint_4.pos, joint_5.pos, joint_6.pos, joint_7.pos, gripper.pos]
+    # SDK 估算关节外力。
+    observation.joint_force:
+      # 字段数据类型。
+      dtype: float32
+      # 单臂七关节力维度。
+      shape: [7]
+      # 力通道的固定顺序。
+      names: [joint_1.force, joint_2.force, joint_3.force, joint_4.force, joint_5.force, joint_6.force, joint_7.force]
+    # SDK 返回的 m_FB_Joint_SToq，可替代 joint_force 作为模型力条件。
+    observation.joint_torque:
+      # 字段数据类型。
+      dtype: float32
+      # 单臂七关节反馈扭矩维度。
+      shape: [7]
+      # 反馈扭矩通道的固定顺序。
+      names: [joint_1.torque, joint_2.torque, joint_3.torque, joint_4.torque, joint_5.torque, joint_6.torque, joint_7.torque]
+    # Policy 学习的绝对位置动作。
+    action:
+      # 字段数据类型。
+      dtype: float32
+      # 七关节加夹爪的动作维度。
+      shape: [8]
+      # 动作通道的固定顺序。
+      names: [joint_1.pos, joint_2.pos, joint_3.pos, joint_4.pos, joint_5.pos, joint_6.pos, joint_7.pos, gripper.pos]
+
+# PI0 主干加独立关节力 token 的训练任务。
+runs:
+  # 从公开 PI0 基座初始化 ForceVLA。
+  - name: forcevla_peg_0726
+    # 每个键会转换成同名的 lerobot-train 命令行参数。
+    args:
+      # 数据集的逻辑仓库标识。
+      dataset.repo_id: hukewei/peg_optical_module_0726force
+      # 数据集的本地根目录。
+      dataset.root: "${dataset_root}"
+      # 留出百分之十的 episode 计算验证损失。
+      dataset.eval_split: 0.1
+      # 使用 Marvin ForceVLA 实现。
+      policy.type: forcevla
+      # 从公开 PI0 基座初始化共享权重。
+      policy.pretrained_path: lerobot/pi0_base
+      # 指定七维力条件字段。
+      policy.force_feature_key: observation.joint_force
+      # 明确单臂状态维度。
+      policy.proprio_dim: 8
+      # 明确单臂力反馈维度。
+      policy.force_dim: 7
+      # 每次重新观测后只执行一个动作。
+      policy.n_action_steps: 1
+      # 使用 CUDA 训练。
+      policy.device: cuda
+      # 主干使用 bfloat16。
+      policy.dtype: bfloat16
+      # 启用 CUDA 自动混合精度以降低显存占用。
+      policy.use_amp: true
+      # 启用梯度检查点降低显存占用。
+      policy.gradient_checkpointing: true
+      # 模型仓库标识。
+      policy.repo_id: hukewei/forcevla_peg_optical_module_0726force
+      # 默认不自动上传模型。
+      policy.push_to_hub: false
+      # 训练输出目录。
+      output_dir: "${repo_root}/outputs/train/forcevla_peg_0726"
+      # 日志和 W&B 使用的任务名称。
+      job_name: forcevla_peg_0726
+      # 8GB 显存主机使用最小 batch；完整训练建议外部大显存 GPU。
+      batch_size: 1
+      # DataLoader 工作进程数量。
+      num_workers: 4
+      # 总优化步数。
+      steps: 30000
+      # checkpoint 保存间隔。
+      save_freq: 2000
+      # 验证损失计算间隔。
+      eval_steps: 2000
+      # 日志输出间隔。
+      log_freq: 100
+      # 随机种子。
+      seed: 1000
+      # 是否恢复训练。
+      resume: false
+      # 是否记录到 Weights & Biases。
+      wandb.enable: true

@@ -1,0 +1,60 @@
+# 待审查的 LeRobot v3.0 力反馈数据集根目录。
+dataset_root: /home/marvin/hhw/peg_optical_module_0726force
+# 数据审查生成 JSON、Markdown 和 CSV 报告的目录。
+report_dir: "${repo_root}/artifacts/data_audit/rdp"
+# 仓库首页引用的第一个 episode 力反馈曲线文件。
+plot_path: "${repo_root}/assets/data/peg_optical_module_0726force_episode_000_force.png"
+# 要生成曲线和逐帧 CSV 的 episode 索引。
+episode_index: 0
+# 四种模型默认使用的接触条件字段。
+default_model_force_feature: observation.joint_force
+# 数据集必须满足的结构契约。
+contract:
+  # LeRobot 数据集 schema 版本。
+  codebase_version: v3.0
+  # 数据与部署控制循环的采样频率。
+  fps: 30
+  # 训练和部署必须存在且维度一致的字段。
+  features:
+    # B 臂七关节位置和夹爪当前位置。
+    observation.state:
+      # 当前状态字段的数据类型。
+      dtype: float32
+      # 七个 B 臂关节加夹爪的位置维度。
+      shape: [8]
+    # SDK 估算的七维关节外力。
+    observation.joint_force:
+      # 估算外力字段的数据类型。
+      dtype: float32
+      # B 臂七个关节的估算外力维度。
+      shape: [7]
+    # SDK 反馈的七维实际关节扭矩。
+    observation.joint_torque:
+      # 反馈扭矩字段的数据类型。
+      dtype: float32
+      # B 臂七个关节的反馈扭矩维度。
+      shape: [7]
+    # B 臂七关节位置和夹爪目标位置。
+    action:
+      # 位置动作字段的数据类型。
+      dtype: float32
+      # 七个 B 臂关节加夹爪的位置动作维度。
+      shape: [8]
+    # 顶部 RGB 视频输入。
+    observation.images.up_cam:
+      # 顶部相机采用视频编码。
+      dtype: video
+      # 顶部相机的高、宽和 RGB 通道数。
+      shape: [480, 640, 3]
+    # 左侧近景 RGB 视频输入。
+    observation.images.left_close:
+      # 左侧近景相机采用视频编码。
+      dtype: video
+      # 左侧近景相机的高、宽和 RGB 通道数。
+      shape: [480, 640, 3]
+    # 右侧近景 RGB 视频输入。
+    observation.images.right_close:
+      # 右侧近景相机采用视频编码。
+      dtype: video
+      # 右侧近景相机的高、宽和 RGB 通道数。
+      shape: [480, 640, 3]

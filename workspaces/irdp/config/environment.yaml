@@ -1,0 +1,14 @@
+# 当前工作区对应的模型短名称。
+model_name: implicitrdp
+
+# 当前 Git 分支名称，用于确定环境命名。
+branch_name: implicitrdp
+
+# Conda 创建和运行的环境名称。
+environment_name: lerobot_marvin_implicitrdp
+
+# LeRobot 0.6.1 要求的 Python 主次版本。
+python_version: "3.12"
+
+# ImplicitRDP 使用 PyTorch、torchvision、数据集与 Marvin 硬件依赖。
+editable_extras: "[training,hardware,matplotlib-dep]"

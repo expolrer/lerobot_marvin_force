@@ -1,0 +1,192 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+using.txt
+using.zip
+using101.txt
+camera_set.txt
+scripts/convert_force_feedback_pure_offline.py
+scripts/PURE_OFFLINE_GUIDE.md
+scripts/run_offline_conversion.sh
+scripts/verify_conversion.py
+CONVERSION_REPORT.md
+using_marvin.txt
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.agents
+.claude
+.codex
+scripts/verify_conversion_difference.py
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyTorch
+*.pth
+*.pt
+*.ckpt
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Test outputs
+tests/outputs/
+tests/artifacts/
+
+# Datasets and data
+data/
+datasets/
+*.hdf5
+*.h5
+*.zarr
+*.parquet
+
+# Logs
+*.log
+logs/
+wandb/
+*.txt.bak
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# ==================================================
+# Project-specific: Test scripts
+# ==================================================
+# Top-level test scripts (not in tests/ directory)
+see_camera.py
+see_rs.py
+see_2camera.py
+set_motor.py
+reset_arms.py
+reset_arms copy.py
+debug_marvin_teleoperation.py
+check_dataset_integrity.py
+visualize_dataset.py
+test_*.py
+demo_*.py
+
+# ==================================================
+# Project-specific: Redundant documentation
+# ==================================================
+# Keep only official docs:
+# - README.md
+# - MARVIN_README.md
+# - CONTRIBUTING.md
+# - CLAUDE.md
+# - LICENSE
+# - SECURITY.md
+# - docs/marvin_data_collection_flow.md
+# - docs/marvin_force_feedback.md
+
+# Remove top-level duplicates and debug notes
+MARVIN_ETHERCAT_FIX.md
+MARVIN_COMPLETE_FIX.md
+MARVIN_COMPLETION_SUMMARY.md
+MARVIN_TELEOPERATION_FIX.md
+MARVIN_DEBUG_GUIDE.md
+MARVIN_QUICK_REFERENCE.md
+FIXES_SUMMARY.md
+dataset_report.md
+AI_POLICY.md
+AGENTS.md
+*_NOTES.md
+*_TODO.md
+*_DEBUG.md
+
+# Temporary text files
+using.txt
+using.zip
+using101.txt
+camera_set.txt
+*.txt.bak
+
+# ==================================================
+# Robot-specific
+# ==================================================
+# Marvin SDK compiled libraries (if any)
+*.dll
+*.dylib
+
+# Camera calibration files (if sensitive)
+# calibration/*.yaml
+
+# ==================================================
+# Machine learning
+# ==================================================
+# Model checkpoints (keep only released models)
+outputs/
+checkpoints/
+runs/
+mlruns/
+
+# HuggingFace cache (optional - uncomment if needed)
+# .cache/
+# huggingface/
+
+# ==================================================
+# System and editor
+# ==================================================
+.python-version
+*.bak
+*.swn
+.~lock.*
+Thumbs.db
+benchmarks/
+docker/
+docs/
+script/
+media/
+
+# Force-feedback Marvin implementation artifacts kept in version control.
+!docs/
+docs/*
+!docs/force_feedback_marvin.md
+!tests/policies/act/test_force_act.py
+!tests/policies/rdp/test_rdp.py
+!tests/transport/test_openpi_transport.py
+!tests/datasets/
+!tests/datasets/test_rdp_delta_timestamps.py

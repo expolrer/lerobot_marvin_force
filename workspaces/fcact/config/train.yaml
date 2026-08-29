@@ -1,0 +1,94 @@
+# 运行训练脚本时必须激活的 Conda 环境。
+environment_name: lerobot_marvin_fcact
+
+# 启动训练前验证的数据集契约。
+dataset_contract:
+  # LeRobot v3.0 数据集根目录。
+  root: /home/marvin/hhw/peg_optical_module_0726force
+  # 四种模型共享的核心字段、维度和通道顺序。
+  features:
+    # 当前 B 臂状态。
+    observation.state:
+      # 字段数据类型。
+      dtype: float32
+      # 七关节加夹爪的维度。
+      shape: [8]
+      # 状态通道的固定顺序。
+      names: [joint_1.pos, joint_2.pos, joint_3.pos, joint_4.pos, joint_5.pos, joint_6.pos, joint_7.pos, gripper.pos]
+    # SDK 估算关节外力。
+    observation.joint_force:
+      # 字段数据类型。
+      dtype: float32
+      # 单臂七关节力维度。
+      shape: [7]
+      # 力通道的固定顺序。
+      names: [joint_1.force, joint_2.force, joint_3.force, joint_4.force, joint_5.force, joint_6.force, joint_7.force]
+    # SDK 返回的 m_FB_Joint_SToq，可替代 joint_force 作为模型力条件。
+    observation.joint_torque:
+      # 字段数据类型。
+      dtype: float32
+      # 单臂七关节反馈扭矩维度。
+      shape: [7]
+      # 反馈扭矩通道的固定顺序。
+      names: [joint_1.torque, joint_2.torque, joint_3.torque, joint_4.torque, joint_5.torque, joint_6.torque, joint_7.torque]
+    # Policy 学习的绝对位置动作。
+    action:
+      # 字段数据类型。
+      dtype: float32
+      # 七关节加夹爪的动作维度。
+      shape: [8]
+      # 动作通道的固定顺序。
+      names: [joint_1.pos, joint_2.pos, joint_3.pos, joint_4.pos, joint_5.pos, joint_6.pos, joint_7.pos, gripper.pos]
+
+# 按顺序交给官方 lerobot-train 的训练任务。
+runs:
+  # Force-conditioned ACT 的单阶段训练任务。
+  - name: fcact_peg_0726
+    # 每个键会转换成同名的 lerobot-train 命令行参数。
+    args:
+      # 数据集的逻辑仓库标识。
+      dataset.repo_id: hukewei/peg_optical_module_0726force
+      # 数据集的本地根目录。
+      dataset.root: "${dataset_root}"
+      # 留出百分之十的 episode 计算验证损失。
+      dataset.eval_split: 0.1
+      # 使用加入独立力条件的 ACT 实现。
+      policy.type: act
+      # 指定七维力条件字段。
+      policy.force_feature_key: observation.joint_force
+      # ACT 一次预测的动作序列长度。
+      policy.chunk_size: 100
+      # 每个控制周期只执行一个动作以重新读取力反馈。
+      policy.n_action_steps: 1
+      # 使用 CUDA 训练。
+      policy.device: cuda
+      # CUDA 矩阵计算采用 bfloat16 自动混合精度。
+      policy.dtype: bfloat16
+      # 启用自动混合精度。
+      policy.use_amp: true
+      # 训练结果对应的 Hugging Face 模型标识。
+      policy.repo_id: hukewei/fcact_peg_optical_module_0726force
+      # 默认不自动上传模型，避免未授权的外部写入。
+      policy.push_to_hub: false
+      # 训练输出目录。
+      output_dir: "${repo_root}/outputs/train/fcact_peg_0726"
+      # 日志和 W&B 使用的任务名称。
+      job_name: fcact_peg_0726
+      # 每个优化步骤的 batch 大小。
+      batch_size: 4
+      # DataLoader 工作进程数量。
+      num_workers: 4
+      # 总优化步数。
+      steps: 300000
+      # 每隔多少步保存 checkpoint。
+      save_freq: 10000
+      # 每隔多少步计算验证损失。
+      eval_steps: 5000
+      # 每隔多少步输出训练日志。
+      log_freq: 200
+      # 随机种子。
+      seed: 1000
+      # 是否从现有 checkpoint 继续训练。
+      resume: false
+      # 是否记录到 Weights & Biases。
+      wandb.enable: true

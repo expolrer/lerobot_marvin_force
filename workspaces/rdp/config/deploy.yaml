@@ -1,0 +1,158 @@
+# 当前部署配置对应的模型名称。
+model_name: rdp
+
+# 一键部署时必须使用的 Conda 环境名称。
+environment_name: lerobot_marvin_rdp
+
+# Policy 权重和输入契约。
+policy:
+  # 训练输出中的 pretrained_model 目录，也可以填写 Hugging Face 模型 ID。
+  path: /home/marvin/hhw/lerobot_marvin_force/outputs/train/rdp_diffusion_peg_0726/checkpoints/last/pretrained_model
+  # Policy 推理使用的计算设备。
+  device: cuda
+  # 训练与实时部署必须一致的七维力条件字段。
+  force_feature_key: observation.joint_force
+
+# 采用与旧 lerobot-record 评估循环等价的 episodic rollout。
+strategy:
+  # 每个 episode 推理并保存一段评估数据。
+  type: episodic
+  # 默认不自动移动回启动姿态，避免未经确认的硬件运动。
+  reset_to_initial_position: false
+  # 存在 teleoperator 时是否启用平滑交接。
+  smooth_leader_to_follower_handover: true
+
+# RDP 使用低频视觉规划和逐控制周期的反应式力反馈解码。
+inference:
+  # 使用仓库内注册的 RDP 双速率推理引擎。
+  type: rdp
+
+# lerobot-rollout 顶层运行参数。
+runtime:
+  # Policy、相机和机器人控制循环频率。
+  fps: 30
+  # 运行总时长；零表示由 episodic 的 episode 数控制。
+  duration: 0
+  # 写入 rollout 数据集的任务描述。
+  task: peg_optical_module
+  # 是否显示实时观测数据。
+  display_data: false
+  # 是否播放阶段提示音。
+  play_sounds: true
+  # 是否继续写入一个已存在且 schema 一致的数据集。
+  resume: false
+  # 程序退出时是否自动返回启动姿态。
+  return_to_initial_position: false
+
+# Marvin B 臂硬件与力反馈配置。
+robot:
+  # LeRobot 中注册的机器人类型。
+  type: marvin
+  # 机器人控制器 IP 地址。
+  ip: 192.168.1.190
+  # Policy 实际只输出 B 臂 action[8]，因此默认只配置 B 臂。
+  use_arm: B
+  # 使用柔顺的关节阻抗控制模式执行位置目标。
+  control_mode: impedance
+  # 关节速度上限百分比。
+  vel_ratio: 10
+  # 关节加速度上限百分比。
+  acc_ratio: 10
+  # B 臂夹爪和负载的工具质量，单位为 kg。
+  tool_mass_b: 1.04
+  # 是否启用 SDK 工具重力补偿。
+  enable_gravity_compensation: true
+  # 是否连接并控制右侧夹爪。
+  use_gripper: true
+  # 每多少个 30 Hz 控制周期更新一次夹爪命令。
+  gripper_update_divisor: 5
+  # 单个控制周期允许的最大关节位置变化，单位为度。
+  max_policy_joint_step_deg: 2.0
+  # Policy 夹爪位置允许的最小值。
+  min_policy_gripper_pos: 0.3
+  # Policy 夹爪位置允许的最大值。
+  max_policy_gripper_pos: 1.4
+  # 七个关节估算外力的停机阈值，必须在更换负载后重新标定。
+  max_policy_abs_joint_force_by_joint: [6.5, 22.7, 6.0, 9.5, 1.2, 5.2, 2.4]
+  # 是否从 SDK 实时读取力相关通道。
+  use_force_feedback: true
+  # 同时读取估算外力和 m_FB_Joint_SToq，Policy 使用哪一项由 force_feature_key 决定。
+  force_feedback_types: [joint_force, joint_torque]
+  # 三个相机配置；键名直接对齐 0726 数据集，避免推理时误映射。
+  cameras:
+    # 顶部 RGB 相机。
+    up_cam:
+      # 使用 OpenCV 相机后端。
+      type: opencv
+      # 相机稳定设备路径。
+      index_or_path: /dev/cam_up
+      # 图像高度。
+      height: 480
+      # 图像宽度。
+      width: 640
+      # 相机采集帧率。
+      fps: 30
+    # 0726 数据集的左侧近景 RGB 相机，沿用旧 down_cam 设备。
+    left_close:
+      # 使用 OpenCV 相机后端。
+      type: opencv
+      # 相机稳定设备路径。
+      index_or_path: /dev/cam_down
+      # 图像高度。
+      height: 480
+      # 图像宽度。
+      width: 640
+      # 相机采集帧率。
+      fps: 30
+      # 相机输入像素格式。
+      fourcc: YUYV
+      # OpenCV V4L2 后端编号。
+      backend: 200
+    # 0726 数据集的右侧近景 RGB 相机，沿用旧 top_cam 设备。
+    right_close:
+      # 使用 OpenCV 相机后端。
+      type: opencv
+      # 相机稳定设备路径。
+      index_or_path: /dev/cam_top
+      # 图像高度。
+      height: 480
+      # 图像宽度。
+      width: 640
+      # 相机采集帧率。
+      fps: 30
+
+# 相机键已经直接对齐 checkpoint，因此默认不做字段重命名。
+rename_map: {}
+
+# episodic rollout 录制的评估数据集参数。
+dataset:
+  # 新建数据集名称必须以 rollout_ 开头，实际创建时会附加时间戳。
+  repo_id: hukewei/rollout_eval_rdp_peg_optical_module_0726
+  # 本地根目录；null 表示按带时间戳的 repo_id 写入 Hugging Face 缓存。
+  root: null
+  # 数据集采样帧率。
+  fps: 30
+  # 每个 episode 的最长录制时间，单位为秒。
+  episode_time_s: 600
+  # 两个 episode 之间的人工复位时间，单位为秒。
+  reset_time_s: 60
+  # 本次评估要录制的 episode 数量。
+  num_episodes: 20
+  # 数据集中保存相机视频而不是逐帧图片。
+  video: true
+  # 默认不自动上传数据，避免未授权外部写入。
+  push_to_hub: false
+  # 数据集唯一任务描述。
+  single_task: peg_optical_module
+  # 采集时实时编码视频，降低 episode 结束时的阻塞。
+  streaming_encoding: true
+  # 每个视频编码器使用的线程数。
+  encoder_threads: 2
+  # 每个相机的编码帧队列上限。
+  encoder_queue_maxsize: 30
+  # 图片写入子进程数量；流式编码时保持为零。
+  num_image_writer_processes: 0
+  # 每个相机的图片写入线程数。
+  num_image_writer_threads_per_camera: 4
+  # 每多少个 episode 批量编码一次视频。
+  video_encoding_batch_size: 1

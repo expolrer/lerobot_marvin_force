@@ -1,0 +1,5 @@
+# 选择需要部署的模型，可填 fcact、rdp、implicitrdp 或 forcevla。
+model_name: fcact
+
+# 指向所选模型训练结果中的 pretrained_model 目录，也可以填写 Hugging Face 模型 ID。
+weight_path: /home/marvin/hhw/lerobot_marvin_force/outputs/train/fcact_peg_0726/checkpoints/last/pretrained_model
