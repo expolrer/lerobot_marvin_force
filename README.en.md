@@ -1,6 +1,12 @@
-# LeRobot Marvin Force
+# LeRobot Marvin Force · Force-conditioned ACT
 
 [Chinese](README.md) | [English](README.en.md)
+
+> Standalone `fcact` branch. Primary workspace: `workspaces/fcact`. Conda environment: `lerobot_marvin_fcact`.
+>
+> ACT's CVAE and Transformer receive state[8] and a separate force[7]; rollout executes one position action before force is sampled again.
+>
+> This branch remains self-contained: environment setup, dataset audit, training, and physical rollout do not depend on another branch.
 
 A force-conditioned imitation-learning repository for the Marvin robot, based on LeRobot `0.6.1`. The `main` branch supports Force-conditioned ACT, Reactive Diffusion Policy (RDP), ImplicitRDP, and ForceVLA. It preserves the existing Marvin position-control rollout path, migrates policy deployment from `lerobot-record` to `lerobot-rollout`, and provides one-command entry points for environment setup, dataset audit, training, and deployment.
 
