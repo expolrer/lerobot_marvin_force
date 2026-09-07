@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""PI0-based ForceVLA with a separate estimated-joint-force token."""
+"""PI0-based ForceVLA with a separate, dataset-sized force token."""
 
 from pathlib import Path
 
@@ -8,7 +8,7 @@ import torch
 from torch import Tensor, nn
 
 from lerobot.configs import PreTrainedConfig
-from lerobot.policies.pi0.modeling_pi0 import PI0Policy, PI0Pytorch, pad_vector
+from lerobot.policies.pi0.modeling_pi0 import PI0Policy, PI0Pytorch
 from lerobot.policies.pretrained import PreTrainedPolicy
 from lerobot.utils.constants import OBS_STATE
 from lerobot.utils.import_utils import require_package
@@ -24,7 +24,16 @@ class ForceVLAPytorch(PI0Pytorch):
         self.force_proj = nn.Linear(config.force_dim, self.state_proj.out_features)
 
     def embed_suffix(self, state, noisy_actions, timestep):
-        proprio = torch.zeros_like(state)
+        expected_dim = self.config.proprio_dim + self.config.force_dim
+        if state.ndim != 2 or state.shape[-1] != expected_dim:
+            raise ValueError(
+                "ForceVLA internal state must contain proprioception followed by force, "
+                f"expected [B,{expected_dim}], got {tuple(state.shape)}"
+            )
+        # Keep PI0's pretrained state projection at max_state_dim.  The force
+        # vector travels beside it and is projected by force_proj, so even a
+        # dense tactile field does not resize or invalidate pretrained weights.
+        proprio = state.new_zeros((state.shape[0], self.config.max_state_dim))
         proprio[:, : self.config.proprio_dim] = state[:, : self.config.proprio_dim]
         force = state[
             :,
@@ -165,9 +174,17 @@ class ForceVLAPolicy(PI0Policy):
         force = batch[self.config.force_feature_key]
         if state.ndim != 2 or force.ndim != 2:
             raise ValueError(
-                "ForceVLA expects current state/joint-force vectors, got "
+                "ForceVLA expects current state/force vectors, got "
                 f"{state.shape}, {force.shape}"
             )
         if not torch.isfinite(force).all():
             raise ValueError("ForceVLA received non-finite effort")
-        return pad_vector(torch.cat((state, force), dim=-1), self.config.max_state_dim)
+        if state.shape[-1] != self.config.proprio_dim:
+            raise ValueError(
+                f"ForceVLA expected state[{self.config.proprio_dim}], got {tuple(state.shape)}"
+            )
+        if force.shape[-1] != self.config.force_dim:
+            raise ValueError(
+                f"ForceVLA expected force[{self.config.force_dim}], got {tuple(force.shape)}"
+            )
+        return torch.cat((state, force), dim=-1)

@@ -1,0 +1,146 @@
+# 配置格式版本，用于训练器拒绝未知的旧配置。
+schema_version: 1
+# 训练器必须运行在此 Conda 环境中。
+environment_name: lerobot_marvin_manifeel_usb
+# 模型选择；rdp 是先 tokenizer、后 latent diffusion 的两阶段策略。
+model: rdp
+# RDP 实验独占的物理 GPU 编号。
+gpu_ids: "1"
+# Accelerate rendezvous 端口；与其余并行实验不得重复。
+rendezvous_port: 29611
+# 当前为单卡单进程训练。
+num_processes: 1
+# H100 上使用 bf16 autocast。
+mixed_precision: bf16
+# 两阶段训练终端日志目录。
+log_dir: /ssd/force/logs/manifeel_usb/rdp
+
+# ManiFeel USB LeRobot v3 数据集契约。
+dataset:
+  # 数据集逻辑标识。
+  repo_id: local/manifeel_usb
+  # 56 服务器上的数据集根目录。
+  root: /ssd/force/datasets/manifeel_usb/lerobot
+  # LeRobot 数据格式版本。
+  codebase_version: v3.0
+  # 留出 episode 的比例。
+  eval_split: 0.1
+  # 是否以 uint8 读取 RGB 视频。
+  return_uint8: true
+  # 四个核心字段的严格形状契约。
+  features:
+    # 当前末端位姿状态。
+    observation.state:
+      # 状态数据类型。
+      dtype: float32
+      # 位置三维与四元数四维。
+      shape: [7]
+    # 右侧触觉力场展平向量。
+    observation.tactile_force:
+      # 力场数据类型。
+      dtype: float32
+      # 三乘十乘十四维。
+      shape: [420]
+    # 手腕 RGB 视频。
+    observation.images.wrist:
+      # 视频数据类型。
+      dtype: video
+      # HWC 图像尺寸。
+      shape: [256, 256, 3]
+    # 末端六维增量动作。
+    action:
+      # 动作数据类型。
+      dtype: float32
+      # XYZ 平移与轴角旋转。
+      shape: [6]
+
+# RDP 必须按顺序执行 tokenizer 和 diffusion 两个阶段。
+runs:
+  # 第一阶段学习动作 tokenizer 和力反馈反应式 decoder。
+  - name: manifeel_usb_rdp_tokenizer
+    # 第一阶段输出目录。
+    output_dir: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/rdp_tokenizer
+    # 单卡 batch 大小。
+    batch_size: 64
+    # 第一阶段目标优化步数。
+    steps: 100000
+    # DataLoader 工作进程数。
+    num_workers: 8
+    # checkpoint 保存间隔。
+    save_freq: 1000
+    # 离线验证损失间隔。
+    eval_steps: 5000
+    # 日志打印间隔。
+    log_freq: 10
+    # 随机种子。
+    seed: 1000
+    # 是否上传 checkpoint。
+    push_to_hub: false
+    # 是否启用 Weights & Biases；默认关闭。
+    wandb_enable: false
+    # RDP tokenizer 参数。
+    policy:
+      # LeRobot policy 注册名。
+      type: rdp
+      # 当前训练阶段。
+      training_stage: tokenizer
+      # 力反馈条件字段。
+      force_feature_key: observation.tactile_force
+      # 控制动作与力场序列长度。
+      horizon: 32
+      # 当前时刻之前使用的力反馈步数。
+      force_history_pre: 3
+      # 慢速视觉条件包含的观测数。
+      slow_obs_steps: 2
+      # 两个慢速观测在原始帧上的间隔。
+      slow_obs_stride: 1
+      # ManiFeel runner 的控制频率。
+      control_hz: 15
+      # RDP 慢速视觉分支频率。
+      slow_hz: 3
+      # 为完整未来动作窗口丢弃 episode 尾部帧数。
+      drop_n_last_frames: 28
+      # 动作 tokenizer 下采样后的 latent 长度。
+      latent_horizon: 8
+      # RDP 内部精度声明。
+      dtype: bfloat16
+      # 训练设备类型。
+      device: cuda
+      # 模型逻辑标识。
+      repo_id: local/manifeel_usb_rdp_tokenizer
+  # 第二阶段加载第一阶段 checkpoint 并训练视觉 latent diffusion。
+  - name: manifeel_usb_rdp_diffusion
+    # 第二阶段输出目录。
+    output_dir: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/rdp
+    # 指向前一 run 名称；训练器会解析其 last checkpoint。
+    pretrained_from_run: manifeel_usb_rdp_tokenizer
+    # 单卡 batch 大小。
+    batch_size: 32
+    # 第二阶段目标优化步数。
+    steps: 200000
+    # DataLoader 工作进程数。
+    num_workers: 8
+    # checkpoint 保存间隔。
+    save_freq: 1000
+    # 离线验证损失间隔。
+    eval_steps: 5000
+    # 日志打印间隔。
+    log_freq: 10
+    # 随机种子。
+    seed: 1000
+    # 是否上传 checkpoint。
+    push_to_hub: false
+    # 是否启用 Weights & Biases；默认关闭。
+    wandb_enable: false
+    # 第二阶段从 tokenizer checkpoint 继承其余结构，只覆盖以下字段。
+    policy:
+      # 契约所要求的策略类型；不会作为带 policy.path 的 CLI 参数重复传递。
+      type: rdp
+      # 当前训练阶段。
+      training_stage: diffusion
+      # RDP 内部精度声明。
+      dtype: bfloat16
+      # 训练设备类型。
+      device: cuda
+      # 最终模型逻辑标识。
+      repo_id: local/manifeel_usb_rdp

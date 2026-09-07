@@ -7,16 +7,18 @@ from lerobot.policies.forcevla.modeling_forcevla import ForceVLAPolicy, ForceVLA
 from lerobot.utils.constants import ACTION, OBS_STATE
 
 
-def _config() -> ForceVLAConfig:
+def _config(*, proprio_dim: int = 8, force_dim: int = 7) -> ForceVLAConfig:
     return ForceVLAConfig(
         paligemma_variant="gemma_300m",
         action_expert_variant="gemma_300m",
         input_features={
-            OBS_STATE: PolicyFeature(type=FeatureType.STATE, shape=(8,)),
-            "observation.joint_force": PolicyFeature(type=FeatureType.STATE, shape=(7,)),
+            OBS_STATE: PolicyFeature(type=FeatureType.STATE, shape=(proprio_dim,)),
+            "observation.joint_force": PolicyFeature(type=FeatureType.STATE, shape=(force_dim,)),
             "observation.images.top": PolicyFeature(type=FeatureType.VISUAL, shape=(3, 224, 224)),
         },
-        output_features={ACTION: PolicyFeature(type=FeatureType.ACTION, shape=(8,))},
+        output_features={ACTION: PolicyFeature(type=FeatureType.ACTION, shape=(proprio_dim,))},
+        proprio_dim=proprio_dim,
+        force_dim=force_dim,
         chunk_size=4,
         n_action_steps=1,
         device="cpu",
@@ -41,7 +43,7 @@ def _lightweight_core(config: ForceVLAConfig) -> ForceVLAPytorch:
 
 def test_force_token_changes_suffix_without_changing_action_shape():
     model = _lightweight_core(_config())
-    state = torch.zeros(2, 32)
+    state = torch.zeros(2, 15)
     actions = torch.randn(2, 4, 32)
     timestep = torch.rand(2)
     baseline, baseline_pad, baseline_att, _ = model.embed_suffix(state, actions, timestep)
@@ -64,9 +66,23 @@ def test_prepare_state_preserves_state_and_force_channel_order():
     prepared = policy.prepare_state(
         {OBS_STATE: state, "observation.joint_force": force}
     )
-    assert prepared.shape == (2, config.max_state_dim)
+    assert prepared.shape == (2, config.proprio_dim + config.force_dim)
     torch.testing.assert_close(prepared[:, :8], state)
     torch.testing.assert_close(prepared[:, 8:15], force)
+
+
+def test_dense_tactile_field_uses_force_token_without_resizing_pi0_state_projection():
+    config = _config(proprio_dim=7, force_dim=420)
+    model = _lightweight_core(config)
+    state_and_force = torch.randn(2, 427)
+    actions = torch.randn(2, 4, config.max_action_dim)
+    suffix, pad_mask, attention_mask, _ = model.embed_suffix(
+        state_and_force, actions, torch.rand(2)
+    )
+    assert model.state_proj.in_features == 32
+    assert model.force_proj.in_features == 420
+    assert suffix.shape == (2, 6, model.state_proj.out_features)
+    assert pad_mask.shape == attention_mask.shape == (2, 6)
 
 
 def test_prepare_state_rejects_non_finite_force():

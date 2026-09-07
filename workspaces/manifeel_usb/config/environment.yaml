@@ -1,0 +1,34 @@
+# LeRobot 训练与策略服务使用的 Conda 环境名。
+environment_name: lerobot_marvin_manifeel_usb
+# 受控创建环境时固定使用的 Python 版本；LeRobot 0.6.1 要求 Python 3.12 或更高。
+python_version: "3.12"
+# 安装模式：archive 表示校验并解包 6 服务器提供的固定离线环境归档。
+install_mode: archive
+# Conda 可执行文件；auto 会依次查找 PATH、/opt/conda 和用户 Miniconda。
+conda_executable: auto
+# 环境固定安装前缀；不依赖 Conda 的名称注册状态。
+environment_prefix: /ssd/force/envs/lerobot_marvin_manifeel_usb
+# archive 模式使用的固定 conda-pack 文件路径。
+conda_pack_archive: /ssd/force/transfer/lerobot_marvin_force_base_6src.tar.gz
+# archive 模式归档的 SHA256；使用 archive 时必须填写完整的 64 位摘要。
+conda_pack_sha256: 29cae6f155b3383630a09693a1c9638176ab569dc6df8986ccdf7c8c93fc44e2
+# controlled 模式只安装训练、ForceVLA 和本地 ZMQ 策略服务所需的 extras。
+editable_extras: "training,pi,pyzmq-dep"
+# controlled 模式是否允许 pip 访问网络；false 时必须由本机缓存满足所有依赖。
+allow_network: false
+# 是否以 --no-deps 将当前分支重新注册到离线环境，确保运行的正是此 checkout。
+install_current_repo: true
+# 56 服务器上共享的预训练权重与下载缓存根目录。
+cache_root: /ssd/force/cache
+# Hugging Face 模型与 tokenizer 缓存目录。
+hf_home: /ssd/force/cache/huggingface
+# TorchVision ResNet 权重缓存目录。
+torch_home: /ssd/force/cache/torch
+# 是否禁止运行时访问模型网络源；固定缓存准备完成后保持 true。
+offline_mode: true
+# 环境安装完成后必须匹配的 LeRobot 版本。
+required_lerobot_version: "0.6.1"
+# ManiFeel/IsaacGym 官方评测使用的独立旧环境名；本脚本不修改该环境。
+simulator_environment_name: manifeel
+# 56 服务器上 ManiFeel 官方仓库的固定位置。
+manifeel_root: /ssd/force/repos/manifeel

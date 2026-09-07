@@ -6,6 +6,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 usage() {
   cat <<'EOF'
 Usage:
+  ./run.sh manifeel-usb env [--dry-run]
+  ./run.sh manifeel-usb data {download|convert|audit|all}
+  ./run.sh manifeel-usb train {fcact|rdp|implicitrdp|forcevla|vision|all} [--dry-run]
+  ./run.sh manifeel-usb eval {serve|sim|all} {fcact|rdp|implicitrdp|forcevla|vision}
   ./run.sh env [1|2|3|4|fcact|rdp|implicitrdp|forcevla] [--dry-run]
   ./run.sh data [model] [--dry-run]
   ./run.sh train <model> [--dry-run]
@@ -55,6 +59,10 @@ if [[ -z "${stage}" || "${stage}" == "-h" || "${stage}" == "--help" ]]; then
   exit 0
 fi
 shift
+
+if [[ "${stage}" == "manifeel-usb" || "${stage}" == "manifeel_usb" ]]; then
+  exec bash "${REPO_ROOT}/workspaces/manifeel_usb/run.sh" "$@"
+fi
 
 case "${stage}" in
   env|data)

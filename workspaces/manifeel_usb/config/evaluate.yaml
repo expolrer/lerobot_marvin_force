@@ -1,0 +1,135 @@
+# ZMQ 消息协议版本；服务端和模拟器端必须完全一致。
+protocol_version: manifeel-lerobot-zmq-v1
+# 仅允许回环地址，防止未鉴权的 policy 服务暴露到网络。
+bind_host: 127.0.0.1
+# 单次请求或响应的超时时间，单位毫秒。
+timeout_ms: 120000
+# 每条消息允许的最大字节数，防止异常输入耗尽内存。
+max_message_bytes: 268435456
+# ManiFeel 官方仓库在 56 服务器上的路径。
+manifeel_root: /ssd/force/repos/manifeel
+# ManiFeel 官方 IsaacGym Python 环境名。
+simulator_environment_name: manifeel
+# 官方 Hydra 配置文件名，不包含 .yaml 后缀。
+isaacgym_config_name: isaacgym_config_usb
+# 官方 force runner 的 Python 类路径。
+force_runner_class: manifeel.env_runner.vistac_pih_runner_unit.ManifeelRunner
+# 官方纯视觉 runner 的 Python 类路径。
+vision_runner_class: manifeel.env_runner.vistac_pih_runner.ManifeelRunner
+# 并行评测环境数量；官方 USB 评测默认 50。
+n_test: 50
+# 写出视频的环境数量。
+n_test_vis: 2
+# 官方测试初始随机种子。
+test_start_seed: 100000
+# 每个 episode 的最大控制步数。
+max_steps: 500
+# runner 每次向策略提供的历史观测步数；策略桥只取最新一帧。
+n_obs_steps: 1
+# 每次环境 step 执行的动作数；必须为 1 才能逐帧闭环力反馈。
+n_action_steps: 1
+# 官方 runner 的录像目标帧率；物理控制频率由 USB task 配置保持为 15 Hz。
+fps: 10
+# 视频 CRF；数值越低质量越高、文件越大。
+video_crf: 22
+# runner 进度条最短刷新间隔，单位秒。
+tqdm_interval_sec: 5.0
+# 手腕 RGB 观测键。
+wrist_source_key: wrist
+# 官方 ManiFeel 力场观测键。
+tactile_source_key: tactile_force_field_right
+# 发送给 LeRobot policy 的状态键。
+state_target_key: observation.state
+# 发送给 LeRobot policy 的图像键。
+wrist_target_key: observation.images.wrist
+# 发送给力条件 policy 的触觉键。
+tactile_target_key: observation.tactile_force
+# ForceVLA 文本 tokenizer 使用的任务描述。
+task_text: Insert the USB plug into the socket.
+# 状态维度契约。
+state_dim: 7
+# 力场展平维度契约；仿真 CHW 会先还原为 HWC，再按 C-order 展平。
+tactile_dim: 420
+# 手腕图像通道数。
+image_channels: 3
+# 手腕图像高度。
+image_height: 256
+# 手腕图像宽度。
+image_width: 256
+# 输出动作维度；XYZ 加轴角，保持 ManiFeel 官方 EEF delta 语义。
+action_dim: 6
+# 评测产物根目录。
+output_root: /ssd/force/reports/manifeel_usb/evaluation
+
+# 每个模型的 checkpoint、端口和输入契约。
+models:
+  # Force-conditioned ACT。
+  fcact:
+    # checkpoint 的 pretrained_model 目录；可用 CLI --checkpoint 覆盖。
+    checkpoint: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/fcact/checkpoints/last/pretrained_model
+    # 服务端监听端口。
+    port: 5560
+    # policy 推理使用的物理 GPU。
+    policy_gpu_id: 0
+    # IsaacGym 使用的物理 GPU。
+    simulator_gpu_id: 0
+    # checkpoint 内必须记录的 policy 类型。
+    policy_type: act
+    # 是否把 420 维触觉力场发送给 policy。
+    use_force: true
+  # 两阶段 Reactive Diffusion Policy。
+  rdp:
+    # 最终 diffusion checkpoint。
+    checkpoint: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/rdp/checkpoints/last/pretrained_model
+    # 服务端监听端口。
+    port: 5561
+    # policy 推理使用的物理 GPU。
+    policy_gpu_id: 1
+    # IsaacGym 使用的物理 GPU。
+    simulator_gpu_id: 1
+    # checkpoint 内必须记录的 policy 类型。
+    policy_type: rdp
+    # 是否发送触觉力场。
+    use_force: true
+  # 单阶段 ImplicitRDP。
+  implicitrdp:
+    # ImplicitRDP checkpoint。
+    checkpoint: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/implicitrdp/checkpoints/last/pretrained_model
+    # 服务端监听端口。
+    port: 5562
+    # policy 推理使用的物理 GPU。
+    policy_gpu_id: 2
+    # IsaacGym 使用的物理 GPU。
+    simulator_gpu_id: 2
+    # checkpoint 内必须记录的 policy 类型。
+    policy_type: implicitrdp
+    # 是否发送触觉力场。
+    use_force: true
+  # PI0 主干的 ForceVLA。
+  forcevla:
+    # ForceVLA checkpoint。
+    checkpoint: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/forcevla/checkpoints/last/pretrained_model
+    # 服务端监听端口。
+    port: 5563
+    # policy 推理使用的物理 GPU。
+    policy_gpu_id: 3
+    # IsaacGym 使用的物理 GPU。
+    simulator_gpu_id: 3
+    # checkpoint 内必须记录的 policy 类型。
+    policy_type: forcevla
+    # 是否发送触觉力场。
+    use_force: true
+  # 标准 ACT 纯视觉消融基线。
+  vision:
+    # 纯视觉 ACT checkpoint。
+    checkpoint: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/vision_act/checkpoints/last/pretrained_model
+    # 服务端监听端口。
+    port: 5564
+    # policy 推理使用的物理 GPU。
+    policy_gpu_id: 0
+    # IsaacGym 使用的物理 GPU。
+    simulator_gpu_id: 0
+    # checkpoint 内必须记录的 policy 类型。
+    policy_type: act
+    # false 表示 runner 和策略请求都忽略触觉力场。
+    use_force: false

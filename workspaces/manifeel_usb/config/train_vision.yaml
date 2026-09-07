@@ -1,0 +1,98 @@
+# 配置格式版本，用于训练器拒绝未知的旧配置。
+schema_version: 1
+# 训练器必须运行在此 Conda 环境中。
+environment_name: lerobot_marvin_manifeel_usb
+# 模型选择；vision 表示不读取触觉力场的标准 ACT 消融基线。
+model: vision
+# 默认 GPU；可用训练脚本的 --gpu-ids 覆盖。
+gpu_ids: "0"
+# Accelerate rendezvous 端口；并行运行时必须唯一。
+rendezvous_port: 29614
+# 本实验启动的训练进程数。
+num_processes: 1
+# Accelerate 自动混合精度模式。
+mixed_precision: bf16
+# 训练终端日志目录。
+log_dir: /ssd/force/logs/manifeel_usb/vision
+
+# ManiFeel USB 转换后的 LeRobot v3 数据集设置。
+dataset:
+  # 数据集逻辑标识。
+  repo_id: local/manifeel_usb
+  # 56 服务器上的数据集根目录。
+  root: /ssd/force/datasets/manifeel_usb/lerobot
+  # LeRobot 数据格式版本契约。
+  codebase_version: v3.0
+  # 留出 episode 的比例，用于离线验证损失。
+  eval_split: 0.1
+  # 是否直接以 uint8 读取视频帧。
+  return_uint8: true
+  # 数据集仍必须保留同一批字段，保证消融只改变模型输入。
+  features:
+    # 七维末端状态。
+    observation.state:
+      # 状态字段的数据类型。
+      dtype: float32
+      # 状态向量维度。
+      shape: [7]
+    # 数据中存在但 vision ACT 明确忽略的触觉力场。
+    observation.tactile_force:
+      # 触觉力场字段的数据类型。
+      dtype: float32
+      # 展平后的力场维度。
+      shape: [420]
+    # 手腕 RGB 视频字段。
+    observation.images.wrist:
+      # 视频字段的数据类型。
+      dtype: video
+      # 元数据按 HWC 保存的尺寸。
+      shape: [256, 256, 3]
+    # 六维末端增量动作。
+    action:
+      # 动作字段的数据类型。
+      dtype: float32
+      # 动作向量维度。
+      shape: [6]
+
+# 标准 ACT 视觉消融训练任务。
+runs:
+  # 此名称用于日志与契约诊断。
+  - name: manifeel_usb_vision_act
+    # 训练输出目录。
+    output_dir: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/vision_act
+    # 单进程全局 batch 大小。
+    batch_size: 64
+    # 目标优化步数。
+    steps: 300000
+    # DataLoader 工作进程数。
+    num_workers: 8
+    # checkpoint 保存间隔。
+    save_freq: 1000
+    # 离线验证损失计算间隔。
+    eval_steps: 5000
+    # 训练日志打印间隔。
+    log_freq: 10
+    # 随机种子；与 Force ACT 保持一致以形成消融对照。
+    seed: 1000
+    # 是否上传 checkpoint。
+    push_to_hub: false
+    # 是否启用 Weights & Biases；默认关闭。
+    wandb_enable: false
+    # 标准 ACT 参数。
+    policy:
+      # LeRobot policy 注册名。
+      type: act
+      # 空值明确关闭 force 拼接，因此触觉字段不会进入模型。
+      force_feature_key: null
+      # 动作块长度。
+      chunk_size: 32
+      # 每次闭环只执行一个六维动作。
+      n_action_steps: 1
+      # 时间集成系数。
+      temporal_ensemble_coeff: 0.01
+      # 模型内部声明的数值精度。
+      dtype: bfloat16
+      # 训练设备类型。
+      device: cuda
+      # 模型逻辑标识。
+      repo_id: local/manifeel_usb_vision_act

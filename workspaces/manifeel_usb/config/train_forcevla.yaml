@@ -1,0 +1,102 @@
+# 配置格式版本，用于训练器拒绝未知的旧配置。
+schema_version: 1
+# 训练器必须运行在此 Conda 环境中。
+environment_name: lerobot_marvin_manifeel_usb
+# 模型选择；forcevla 使用 PI0 主干与独立触觉力 token。
+model: forcevla
+# ForceVLA 独占的物理 GPU 编号。
+gpu_ids: "3"
+# Accelerate rendezvous 端口；与其余实验不得重复。
+rendezvous_port: 29613
+# 当前为单卡单进程训练。
+num_processes: 1
+# H100 上使用 bf16 autocast。
+mixed_precision: bf16
+# 训练终端日志目录。
+log_dir: /ssd/force/logs/manifeel_usb/forcevla
+
+# ManiFeel USB LeRobot v3 数据集契约。
+dataset:
+  # 数据集逻辑标识。
+  repo_id: local/manifeel_usb
+  # 56 服务器上的数据集根目录。
+  root: /ssd/force/datasets/manifeel_usb/lerobot
+  # LeRobot 数据格式版本。
+  codebase_version: v3.0
+  # 留出 episode 的比例。
+  eval_split: 0.1
+  # 是否以 uint8 读取 RGB 视频。
+  return_uint8: true
+  # 四个核心字段的严格形状契约。
+  features:
+    # 当前末端位姿状态。
+    observation.state:
+      # 状态数据类型。
+      dtype: float32
+      # 状态向量维度。
+      shape: [7]
+    # 右侧触觉力场展平向量。
+    observation.tactile_force:
+      # 力场数据类型。
+      dtype: float32
+      # 力场向量维度。
+      shape: [420]
+    # 手腕 RGB 视频。
+    observation.images.wrist:
+      # 视频数据类型。
+      dtype: video
+      # HWC 图像尺寸。
+      shape: [256, 256, 3]
+    # 末端增量动作。
+    action:
+      # 动作数据类型。
+      dtype: float32
+      # 动作向量维度。
+      shape: [6]
+
+# ForceVLA 单阶段训练任务。
+runs:
+  # 从本地 PI0 基座初始化 ForceVLA。
+  - name: manifeel_usb_forcevla
+    # 训练输出目录。
+    output_dir: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/forcevla
+    # 首次训练使用的本地 PI0 基座目录；续训后不再读取此路径。
+    pretrained_path: /ssd/force/cache/huggingface/hub/models--lerobot--pi0_base/snapshots/25c379b52ba2ff8788cab921758a3cc3fe3f77f2
+    # 单卡 batch 大小；ForceVLA 显存占用高于其余模型。
+    batch_size: 4
+    # 目标优化步数。
+    steps: 30000
+    # DataLoader 工作进程数。
+    num_workers: 8
+    # checkpoint 保存间隔。
+    save_freq: 1000
+    # 离线验证损失间隔。
+    eval_steps: 2000
+    # 日志打印间隔。
+    log_freq: 10
+    # 随机种子。
+    seed: 1000
+    # 是否上传 checkpoint。
+    push_to_hub: false
+    # 是否启用 Weights & Biases；默认关闭。
+    wandb_enable: false
+    # ForceVLA 参数。
+    policy:
+      # LeRobot policy 注册名。
+      type: forcevla
+      # 触觉力条件字段。
+      force_feature_key: observation.tactile_force
+      # 七维末端状态的显式维度。
+      proprio_dim: 7
+      # 展平触觉力场的显式维度。
+      force_dim: 420
+      # 每次推理仅执行一个动作。
+      n_action_steps: 1
+      # 主干内部精度声明。
+      dtype: bfloat16
+      # 是否启用梯度检查点以降低显存占用。
+      gradient_checkpointing: true
+      # 训练设备类型。
+      device: cuda
+      # 模型逻辑标识。
+      repo_id: local/manifeel_usb_forcevla

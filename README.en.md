@@ -1,256 +1,220 @@
-# LeRobot Marvin Force
+# LeRobot Marvin Force: ManiFeel USB
 
 [Chinese](README.md) | [English](README.en.md)
 
-A force-conditioned imitation-learning repository for the Marvin robot, based on LeRobot `0.6.1`. The `main` branch supports Force-conditioned ACT, Reactive Diffusion Policy (RDP), ImplicitRDP, and ForceVLA. It preserves the existing Marvin position-control rollout path, migrates policy deployment from `lerobot-record` to `lerobot-rollout`, and provides one-command entry points for environment setup, dataset audit, training, and deployment.
+This is the standalone `manifeel_usb` branch of `lerobot_marvin_force`, built for tactile-force ablations on simulated USB insertion. It uses LeRobot `0.6.1`, converts the official single-arm ManiFeel USB demonstrations into a LeRobot Dataset, and supports Force-conditioned ACT, RDP, ImplicitRDP, and ForceVLA with the official simulator success protocol.
 
-> This is an independent, controlled copy of the working content in `/home/marvin/hhw/lerobot_marvin`. It contains none of the old repository's `.git` history, and no commit or push is made to the old repository.
+ManiFeel USB was selected because it is the smallest file-verified candidate that provides a direct force signal rather than a constructed proxy. Its official ZIP is `3,991,771,935` bytes and contains 50 complete episodes, 5,976 frames, and a right-finger `10×14×3` tactile force field. The task is single-arm, so this branch belongs in `lerobot_marvin_force`, not the bimanual `lerobot_vlahost_force` repository.
 
-## Models
+> This is a simulator-specific branch. Its checkpoints output relative end-effector `action[6]`, not Marvin's real-robot joint-position `action[8]`, and never output torque. Do not send these actions to a real Marvin before explicitly adapting the action space, state, cameras, and tactile modality.
 
-| Model | Workspace | Conda environment | Training | Rollout inference |
-|---|---|---|---|---|
-| Force-conditioned ACT | `workspaces/fcact` | `lerobot_marvin_fcact` | Single-stage ACT | `sync` |
-| RDP | `workspaces/rdp` | `lerobot_marvin_rdp` | Tokenizer then diffusion | `rdp` |
-| ImplicitRDP | `workspaces/irdp` | `lerobot_marvin_implicitrdp` | Single-stage joint optimization | `rdp` |
-| ForceVLA | `workspaces/fvla` | `lerobot_marvin_forcevla` | PI0 force-token fine-tuning | `sync` |
+## Reproducible sources
 
-The `main` branch contains all four models. The `fcact`, `rdp`, `implicitrdp`, and `forcevla` branches each provide a complete standalone version for one model.
+| Item | Pinned version |
+|---|---|
+| ManiFeel code | `purdue-mars/manifeel@ebfa9e1784848903f642ba1b5233f42511a6de62` |
+| ManiFeel simulator | `purdue-mars/manifeel-isaacgymenvs@1a61da683cf1485f3307684c740771ea5e842b39` |
+| Dataset revision | `purdue-mars/manifeel@d2f3bd1fa7eb38ee807d4f3df2c2a3a3821371ea` |
+| Official file | `data/usb_quan_Aug05.zip` |
+| File size | `3,991,771,935` bytes |
+| File SHA256 | `25e7912dec28282a2294adc34f819be59a01cebc73ec21501d938dc78f64cb00` |
+| License | MIT |
 
-### How force enters each architecture
+The downloader pins that revision and checks both length and SHA256. A moving `main` file is never accepted as an equivalent source.
 
-- Force-conditioned ACT retains ACT's CVAE, Transformer, and action chunks. The current state and a separate seven-dimensional force feature enter both the VAE encoder and the ACT backbone. Training may predict a chunk of 100 actions, while rollout uses `n_action_steps=1` so the next control tick reads force again.
-- RDP separates low-rate visual diffusion planning from a force-conditioned tokenizer/decoder that generates a position action from the newest force at every control tick. Training runs tokenizer and diffusion stages in order.
-- ImplicitRDP keeps RDP's reactive deployment semantics while jointly optimizing the action latent, force-conditioned decoder, and visual diffusion objective in one stage.
-- ForceVLA is a Marvin-adapted PI0 force-token implementation. Three RGB streams, task text, and `state[8]` use the PI0 path, while a seven-dimensional joint-force vector is projected as a separate conditioning token. This is not a line-by-line reproduction of a six-dimensional TCP-wrench model.
+## Force path in each model
 
-All four policies use force as an observation and still output arm-B position commands:
+| Model | Force path | Training | Online action |
+|---|---|---|---|
+| Force-conditioned ACT | Separately projects `state[7]` and `force[420]` into the CVAE and Transformer | One stage | Re-observe, then execute one 6D action |
+| RDP | Slow visual diffusion plans a latent; the fast decoder reads current force within the chunk | Tokenizer, then diffusion | Reactive relative EEF action |
+| ImplicitRDP | Jointly optimizes the RDP action latent, visual diffusion, and force-conditioned decoder | One stage | Reactive relative EEF action |
+| ForceVLA | Keeps the PI0 state projection and maps the 420D field to a separate force token | PI0-base fine-tuning | Re-observe, then execute one 6D action |
+
+ForceVLA does not squeeze the tactile field into PI0's fixed 32D state slot. A separate projection produces the force token, preserving the pretrained state projection shape.
 
 ```text
-3 RGB streams + state[8] + live force[7] + optional task text
-                              │
-                              ▼
-                            Policy
-                              │
-                              ▼
-       action[8] = 7 arm-B target joint positions + gripper target
+wrist RGB + EEF pose[7] + current right-finger TacFF[420]
+                             │
+                             ▼
+                           Policy
+                             │
+                             ▼
+ action[6] = normalized [Δx, Δy, Δz, axis-angle Δrx, Δry, Δrz]
+                             │
+                             ▼
+              ManiFeel steps and samples fresh TacFF
 ```
 
-No policy outputs joint torque. The Marvin position or impedance controller executes the position targets; force only changes the next policy decision.
+The simulator scales translation by `0.01 m` and rotation by `0.05 rad`. The USB gripper stays closed at `0.0145`, so there is no gripper action channel.
 
-## Layout
+## Workspace
 
 ```text
-lerobot_marvin_force/
-├── config/deploy.yaml
+workspaces/manifeel_usb/
+├── config/
+│   ├── environment.yaml
+│   ├── data.yaml
+│   ├── train_fcact.yaml
+│   ├── train_rdp.yaml
+│   ├── train_implicitrdp.yaml
+│   ├── train_forcevla.yaml
+│   ├── train_vision.yaml
+│   └── evaluate.yaml
 ├── scripts/
-├── workspaces/{fcact,rdp,irdp,fvla}/
-├── src/lerobot/policies/
-├── src/lerobot/robots/marvin/
-├── src/lerobot/rollout/
-├── assets/data/
-├── artifacts/data_audit/
+│   ├── setup_environment.sh
+│   ├── download_dataset.py
+│   ├── convert_manifeel_to_lerobot.py
+│   ├── audit_dataset.py
+│   ├── plot_episode_force.py
+│   ├── train.py
+│   └── serve_lerobot_act.py
+├── manifeel_adapter/
+├── tests/
 └── run.sh
 ```
 
-Every workspace is self-contained:
-
-```text
-workspaces/<model>/
-├── config/{environment,data,train,deploy}.yaml
-├── scripts/{setup_environment.sh,audit_dataset.py,train.py,deploy.py}
-└── run.sh
-```
-
-Every YAML parameter has a Chinese inline explanation for operators on the target machine. Validate this contract with `python scripts/check_yaml_comments.py`.
+Every configurable YAML parameter has an operator-facing Chinese comment. All four stages are self-contained on this branch; no other model branch is required.
 
 ## Stage 1: environment
 
-Requirements are Ubuntu, Conda or Miniconda, a compatible NVIDIA driver/CUDA stack, access to the Marvin control network and SDK libraries, and the three cameras. Initial ForceVLA setup also needs access to the PI0 base weights.
-
-```bash
-cd /home/marvin/hhw/lerobot_marvin_force
-chmod +x run.sh workspaces/*/run.sh workspaces/*/scripts/setup_environment.sh
-
-# Interactive selection: 1, 2, 3, or 4
-./run.sh env
-
-# Direct selection
-./run.sh env fcact
-./run.sh env rdp
-./run.sh env implicitrdp
-./run.sh env forcevla
-
-# Preview without installing
-./run.sh env fcact --dry-run
-```
-
-The choices are `1` Force-conditioned ACT, `2` RDP, `3` ImplicitRDP, and `4` ForceVLA. Each installer creates the exact Python `3.12` Conda environment declared in `environment.yaml` and performs an editable install of this repository. Reinstallation is required after copying so the new `lerobot-rollout` entry point is generated.
-
-## Stage 2: dataset audit
-
-Default dataset:
+The server-56 layout is:
 
 ```text
-/home/marvin/hhw/peg_optical_module_0726force
+repository       /ssd/force/repos/lerobot_marvin_force_manifeel_usb
+environment      /ssd/force/envs/lerobot_marvin_manifeel_usb
+source data      /ssd/force/datasets/manifeel_usb/source
+LeRobot data     /ssd/force/datasets/manifeel_usb/lerobot
+outputs          /ssd/force/outputs/lerobot_marvin_force/manifeel_usb
+logs             /ssd/force/logs/manifeel_usb
 ```
 
-It is a LeRobot Dataset `v3.0` with 149 episodes, 161,728 frames at 30 FPS, and approximately 89.85 minutes of data. “First episode” is the correct dataset term; an epoch is a training concept. The learned interface controls Marvin arm B, not a bimanual 16-dimensional action.
+```bash
+git clone --branch manifeel_usb --single-branch \
+  git@github.com:expolrer/lerobot_marvin_force.git \
+  /ssd/force/repos/lerobot_marvin_force_manifeel_usb
+cd /ssd/force/repos/lerobot_marvin_force_manifeel_usb
+./run.sh manifeel-usb env
+```
 
-### Complete feature table
+The installer supports the configured offline conda-pack archive as well as an explicit Conda installation. It installs only the LeRobot training, Zarr conversion, plotting, and ZMQ bridge dependencies. PI0, PaliGemma, and ResNet weights must exist at the configured cache paths; preflight checks prevent an unpinned download during training.
 
-| Feature | dtype | shape | Source or meaning |
+The official success environment uses Python `3.8` and a custom IsaacGym/TacSL build. It remains isolated from the LeRobot `0.6.1` Python `3.12` environment. Use H100s for offline training; run the legacy camera-based evaluator on a compatible RTX 4090 host.
+
+## Stage 2: download, conversion, and audit
+
+### Complete source Zarr schema
+
+| Source key | dtype | shape | Meaning |
 |---|---|---:|---|
-| `observation.images.up_cam` | `video` | `[480,640,3]` | Upper RGB, AV1, 30 FPS |
-| `observation.images.left_close` | `video` | `[480,640,3]` | Left close-view RGB, AV1, 30 FPS |
-| `observation.images.right_close` | `video` | `[480,640,3]` | Right close-view RGB, AV1, 30 FPS |
-| `observation.state` | `float32` | `[8]` | Seven arm-B joint positions and gripper position |
-| `observation.joint_vel` | `float32` | `[7]` | `m_FB_Joint_Vel` |
-| `observation.joint_torque` | `float32` | `[7]` | `m_FB_Joint_SToq`, controller feedback joint torque |
-| `observation.joint_force` | `float32` | `[7]` | `m_EST_Joint_Force`, estimated external joint force |
-| `observation.cart_force` | `float32` | `[6]` | `m_EST_Cart_FN`; entirely zero and invalid as a condition |
-| `action` | `float32` | `[8]` | Seven arm-B target joint positions and gripper target |
-| `timestamp` | `float32` | `[1]` | Time within the episode |
-| `frame_index` | `int64` | `[1]` | Frame within the episode |
-| `episode_index` | `int64` | `[1]` | Episode index |
-| `index` | `int64` | `[1]` | Global frame index |
-| `task_index` | `int64` | `[1]` | Task index |
+| `data/state` | `float32` | `[5976,7]` | World-frame EEF `x,y,z,qx,qy,qz,qw` |
+| `data/action` | `float32` | `[5976,6]` | Normalized relative translation and axis-angle rotation |
+| `data/tactile_force_field_right` | `float32` | `[5976,10,14,3]` | Right-finger local `normal,shear_x,shear_y` |
+| `data/tactile_depth_right` | `float32` | `[5976,10,14]` | Right tactile depth |
+| `data/left_tactile_camera_taxim` | `float32` | `[5976,320,240,3]` | Left tactile RGB |
+| `data/right_tactile_camera_taxim` | `float32` | `[5976,320,240,3]` | Right tactile RGB |
+| `data/wrist` | `float32` | `[5976,256,256,3]` | Default wrist RGB |
+| `data/wrist_2` | `float32` | `[5976,256,256,3]` | Second wrist RGB |
+| `data/front` | `float32` | `[5976,256,256,3]` | Front RGB |
+| `data/side` | `float32` | `[5976,256,256,3]` | Side RGB |
+| `meta/episode_ends` | `int64` | `[50]` | Cumulative episode end offsets |
 
-State and action channel order is `joint_1 ... joint_7, gripper`. Both joint-force features use `joint_1 ... joint_7`.
+All 12,218 ZIP entries and every expected Zarr chunk were checked. Episode lengths are 76–168 frames; episode zero has 103 frames. The source has no timestamps. `sim.dt=0.016667 s` and `controlFrequencyInv=4` imply `15 FPS`; the runner's `10 FPS` value is video encoding only.
 
-### Torque and estimated external force are different signals
+### Minimal LeRobot mapping
 
-| Feature | SDK variable | Default input | Meaning |
+| LeRobot feature | dtype | shape | Conversion |
 |---|---|---:|---|
-| `observation.joint_torque` | `m_FB_Joint_SToq` | Optional | Controller feedback torque, including gravity, payload, drive, and control components. The interface alone does not prove an independent torque-sensor source. |
-| `observation.joint_force` | `m_EST_Joint_Force` | Yes | SDK-estimated external joint disturbance and the default conditioning signal. |
-| `observation.cart_force` | `m_EST_Cart_FN` | No | Nominal Cartesian force/moment, but all values are zero in this dataset. |
+| `observation.images.wrist` | `video` | `[3,256,256]` | `float32[0,1]` to RGB video |
+| `observation.state` | `float32` | `[7]` | Preserve EEF pose |
+| `observation.tactile_force` | `float32` | `[420]` | Flatten source `[10,14,3]` in HWC C order |
+| `action` | `float32` | `[6]` | Preserve the action paired with the current observation |
 
-To train on `m_FB_Joint_SToq`, change `policy.force_feature_key` to `observation.joint_torque` in both training and deployment YAML. Rollout can expose both signals, but the selected key, order, unit, sign, and offset must match training exactly.
+The flattening order keeps `normal,shear_x,shear_y` adjacent for each taxel. Do not transpose to CHW before flattening.
 
-A different robot dataset is not compatible merely because it contains `float32[7]`; cameras, state/action definitions, joint order, rate, units, calibration, and live SDK semantics must also match.
+```bash
+./run.sh manifeel-usb data all
 
-### Cross-episode consistency
+# Individual stages
+./run.sh manifeel-usb data download
+./run.sh manifeel-usb data convert
+./run.sh manifeel-usb data audit
+```
 
-The force sequences are not identical. Their episode-level baselines are close while insertion contact dynamics remain present. Ranges of episode means for `observation.joint_force` are:
+Downloads support ranges, retries, and checksum verification. Conversion updates its journal atomically only after a complete episode has been saved and finalized. Resume first verifies the source SHA, completed episode prefix, frame count, and schema.
+
+The audit verifies 50 episodes, 5,976 frames, boundaries, dtypes, shapes, finite values, TacFF C order, same-frame action pairing, video decoding, source manifest, and converted statistics. Reports are written to `/ssd/force/reports/manifeel_usb`.
+
+![Right-finger tactile force in ManiFeel USB episode zero](assets/data/manifeel_usb_episode_000_force.png)
+
+## Stage 3: resumable four-model training
+
+All runs share the same data, split, seed, and force feature. Server 56 maps one run to each GPU:
+
+| GPU | Run |
+|---:|---|
+| 0 | Force-conditioned ACT |
+| 1 | RDP tokenizer followed by RDP diffusion |
+| 2 | ImplicitRDP |
+| 3 | ForceVLA |
+
+```bash
+./run.sh manifeel-usb train all --dry-run
+./run.sh manifeel-usb train all
+
+./run.sh manifeel-usb train fcact
+./run.sh manifeel-usb train rdp
+./run.sh manifeel-usb train implicitrdp
+./run.sh manifeel-usb train forcevla
+```
+
+Each launch looks for:
 
 ```text
-J1  0.150 to  0.514 Nm
-J2 -0.943 to -0.497 Nm
-J3  0.329 to  0.637 Nm
-J4 -0.266 to  0.083 Nm
-J5  0.038 to  0.245 Nm
-J6 -0.317 to -0.040 Nm
-J7 -0.282 to -0.092 Nm
+checkpoints/last/pretrained_model/train_config.json
 ```
 
-The standard deviations of those episode means are `[0.0785, 0.0850, 0.0689, 0.0768, 0.0455, 0.0778, 0.0375] Nm`. Training and deployment should therefore keep payload, tool parameters, force estimation, zero point, and control mode consistent.
+When present, the wrapper uses that saved configuration with `--resume=true`, restoring the model, optimizer, scheduler, random state, and training step. YAML `steps` is the final target step, not an increment. A launch contract rejects unsafe resume after a dataset, world-size, batch-size, force-key, or stage change.
+
+RDP resumes its tokenizer until stage one is complete, then starts or resumes diffusion. W&B and Hub pushes are disabled by default.
+
+The RGB-only ACT ablation uses the same dataset and ACT settings but sets `policy.force_feature_key=null`:
 
 ```bash
-# Validate without writing artifacts
-./run.sh data fcact --dry-run
-
-# Generate reports, per-episode statistics, CSV files, and the homepage plot
-./run.sh data fcact
+./run.sh manifeel-usb train vision
 ```
 
-Artifacts are written to:
+Keeping the force column in the shared dataset guarantees identical episodes, split, and images for the comparison.
+
+## Stage 4: official simulator success evaluation
+
+The adapter preserves the official USB environment, 50 fixed seeds, 500-step limit, and success predicate. A local ZMQ bridge isolates the two Python environments:
 
 ```text
-artifacts/data_audit/<model>/dataset_report.json
-artifacts/data_audit/<model>/feature_table.md
-artifacts/data_audit/<model>/episode_force_summary.csv
-artifacts/data_audit/<model>/episode_000_force.csv
-assets/data/peg_optical_module_0726force_episode_000_force.png
+ManiFeel Python 3.8 / IsaacGym             LeRobot Python 3.12
+state + wrist + TacFF ── localhost ZMQ ──> processor + policy
+6D relative EEF action <────────────────── postprocessor
 ```
-
-Episode 0 contains 1,141 frames and lasts about 38 seconds. The upper plot is `m_FB_Joint_SToq`; the lower plot is `m_EST_Joint_Force`.
-
-![Feedback joint torque and estimated external joint force in the first episode](assets/data/peg_optical_module_0726force_episode_000_force.png)
-
-## Stage 3: training
-
-The wrapper validates YAML and the dataset contract, then invokes the stock LeRobot `0.6.1` `lerobot-train` command. ACT uses the stock `EpisodeAwareSampler`; no keyframe labels, weights, or custom keyframe sampler remain.
 
 ```bash
-# Preview
-./run.sh train fcact --dry-run
-./run.sh train rdp --dry-run
-./run.sh train implicitrdp --dry-run
-./run.sh train forcevla --dry-run
+./run.sh manifeel-usb eval serve fcact \
+  --checkpoint /path/to/checkpoints/last/pretrained_model
 
-# Train
-./run.sh train fcact
-./run.sh train rdp
-./run.sh train implicitrdp
-./run.sh train forcevla
+./run.sh manifeel-usb eval sim fcact --num-envs 1
+./run.sh manifeel-usb eval sim fcact --num-envs 50
 ```
 
-Parameters live in `workspaces/<model>/config/train.yaml`. RDP first trains the tokenizer and then loads `outputs/train/rdp_tokenizer_peg_0726/checkpoints/last/pretrained_model` for diffusion training. `policy.push_to_hub` defaults to `false`; W&B defaults to enabled. Check paths, IDs, W&B authentication, GPU memory, and the selected force key first.
+USB succeeds when the mean Euclidean distance across four corresponding plug/socket keypoints is strictly below `0.0079916 m`. The official wrapper maps the success reset to reward, so:
 
-## Stage 4: deployment
-
-Select the model and checkpoint in `config/deploy.yaml`:
-
-```yaml
-# Select fcact, rdp, implicitrdp, or forcevla.
-model_name: fcact
-
-# A pretrained_model directory or Hugging Face model ID.
-weight_path: /home/marvin/hhw/lerobot_marvin_force/outputs/train/fcact_peg_0726/checkpoints/last/pretrained_model
+```text
+success_rate = mean(max reward over time for each environment)
 ```
 
-Robot, camera, episodic-recording, and inference settings live in the selected workspace's `config/deploy.yaml`.
+Evaluation fixes `n_action_steps=1`, sampling fresh TacFF after every action. Force and vision ablations must use identical `test_start_seed`, environment count, and step limit.
 
-```bash
-# Validate the environment, weights, force key, cameras, and inference type
-./run.sh deploy --dry-run
+## References and scope
 
-# Connect to the physical Marvin only after manual review
-./run.sh deploy
-```
-
-### Migration from `lerobot-record`
-
-| Old concept | New configuration |
-|---|---|
-| Policy loaded by `lerobot-record` | `lerobot-rollout` |
-| `--policy.path=...` | Root `config/deploy.yaml` `weight_path` |
-| Fixed evaluation episodes | `strategy.type: episodic` |
-| ACT / ForceVLA | `inference.type: sync` |
-| RDP / ImplicitRDP | `inference.type: rdp` |
-| `--dataset.episode_time_s=600` | `dataset.episode_time_s: 600` |
-| `--dataset.num_episodes=20` | `dataset.num_episodes: 20` |
-| `--dataset.single_task=...` | `runtime.task` and `dataset.single_task` |
-| `--resume=true` | `runtime.resume: true`, only for an existing compatible dataset |
-
-New rollout dataset names must start with `rollout_` and receive a timestamp. Defaults are `resume=false` and `dataset.root=null` to prevent accidental writes into old data. To resume, provide the exact stamped repo ID and root and set `resume=true`.
-
-The old `/dev/cam_up`, `/dev/cam_down`, and `/dev/cam_top` devices are exposed directly under the training keys `up_cam`, `left_close`, and `right_close`. Verify the physical close-camera views before rollout.
-
-`robot.use_arm=B` is the safe default because the policy only emits arm-B `action[8]`. Setting `AB` also configures arm A in the SDK, but it does not make the policy bimanual.
-
-### Physical safety
-
-- Always run `./run.sh deploy --dry-run` first.
-- Verify the IP, impedance mode, `tool_mass_b=1.04`, center of mass/tool offset, and live-force unit and sign.
-- Shorten the first episode, reduce speed, keep the emergency stop available, and maintain human supervision.
-- The default 2-degree per-tick joint step and per-joint force envelopes are task-derived safeguards, not certified safety limits; recalibrate them after any payload change.
-- Automatic return to the startup pose is disabled by default to avoid unreviewed motion.
-- Stop immediately on NaN/Inf, camera loss, abnormal contact, or a force-limit violation.
-
-## ForceVLA GPU note
-
-The PI0 backbone is substantially larger than the other policies. Defaults use `batch_size=1`, `bfloat16`, and gradient checkpointing, but do not guarantee training or real-time 30 Hz inference on an 8 GB GPU. Validate with a short run first. At least 24 GB is recommended for initial experiments; 48 GB or more is better suited to full training.
-
-## Common commands
-
-```bash
-./run.sh --help
-./run.sh env
-./run.sh data fcact
-./run.sh train fcact --dry-run
-./run.sh train fcact
-./run.sh deploy --dry-run
-./run.sh deploy
-```
+- ManiFeel code: <https://github.com/purdue-mars/manifeel>
+- ManiFeel data: <https://huggingface.co/datasets/purdue-mars/manifeel>
+- This branch invokes native LeRobot `lerobot-train`; it does not rename ManiFeel's Diffusion Policy trainer.
+- Server 56 H100s are used only for offline training. Record driver, CUDA, simulator commit, and seeds separately when running the legacy IsaacGym/TacSL evaluator on a compatible GPU.

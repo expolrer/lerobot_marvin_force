@@ -1,0 +1,42 @@
+# ManiFeel 官方数据仓库的固定 revision，防止上游 main 漂移。
+source_revision: d2f3bd1fa7eb38ee807d4f3df2c2a3a3821371ea
+# 官方 ZIP 的固定下载地址；下载器还会独立校验长度与 SHA256。
+source_url: https://huggingface.co/datasets/purdue-mars/manifeel/resolve/d2f3bd1fa7eb38ee807d4f3df2c2a3a3821371ea/data/usb_quan_Aug05.zip?download=true
+# 下载后保存的官方文件名。
+archive_name: usb_quan_Aug05.zip
+# 官方 ZIP 的精确字节数。
+archive_size: 3991771935
+# 官方 Git-LFS OID，同时也是完整 ZIP 的 SHA256。
+archive_sha256: 25e7912dec28282a2294adc34f819be59a01cebc73ec21501d938dc78f64cb00
+# ZIP、解压 Zarr 和下载 manifest 的父目录。
+source_dir: /ssd/force/datasets/manifeel_usb/source
+# 安全解压后包含 data 与 meta 的 Zarr 根目录。
+source_zarr: /ssd/force/datasets/manifeel_usb/source/usb_quan_Aug05
+# 转换后的 LeRobot Dataset 根目录。
+converted_root: /ssd/force/datasets/manifeel_usb/lerobot
+# 写入 LeRobot 元数据的本地逻辑仓库标识；默认不上传 Hub。
+repo_id: local/manifeel_usb
+# USB 插接任务文本。
+task: insert the USB plug into the socket
+# 由仿真物理步长与控制降采样严格推导的数据采样频率。
+fps: 15
+# 腕部 RGB 在 LeRobot 中使用视频编码，减少小文件数量。
+image_storage: video
+# 转换时用于图像写入的线程数。
+image_writer_threads: 8
+# 完整官方数据应包含的 episode 数。
+expected_episodes: 50
+# 完整官方数据应包含的总帧数。
+expected_frames: 5976
+# 数据审查 JSON、CSV 和曲线输出目录。
+audit_output_dir: /ssd/force/reports/manifeel_usb
+# 仓库首页引用的真实第一集触觉力曲线路径。
+readme_plot_path: assets/data/manifeel_usb_episode_000_force.png
+# 默认审查全部 episode；null 表示不截断。
+audit_max_episodes: null
+# 判断触觉力列是否退化为常量时使用的最小变化阈值。
+force_epsilon: 1.0e-12
+# 默认逐帧比较原始 Zarr 与转换后 LeRobot 数值。
+skip_value_compare: false
+# 默认只接受固定 SHA256 的标准官方数据，不接受任意同结构目录。
+allow_noncanonical_source: false

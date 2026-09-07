@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""LeRobot-native ForceVLA configuration for the single-arm Marvin policy."""
+"""LeRobot-native ForceVLA configuration with an independent force token."""
 
 from dataclasses import dataclass
 
@@ -12,12 +12,7 @@ from lerobot.utils.constants import OBS_STATE
 @PreTrainedConfig.register_subclass("forcevla")
 @dataclass
 class ForceVLAConfig(PI0Config):
-    """PI0-based VLA with a distinct estimated-joint-force token.
-
-    The reference dataset and the standalone Marvin rollout both expose only
-    the follower B arm: seven joint positions plus one gripper position, seven
-    estimated external joint-force channels, and eight position actions.
-    """
+    """PI0-based VLA with a force token whose width follows dataset metadata."""
 
     force_feature_key: str = "observation.joint_force"
     proprio_dim: int = 8
@@ -38,7 +33,7 @@ class ForceVLAConfig(PI0Config):
             )
         if force_shape != (self.force_dim,):
             raise ValueError(
-                f"Expected joint_force[{self.force_dim}], got {force_shape}"
+                f"Expected force[{self.force_dim}], got {force_shape}"
             )
-        if self.proprio_dim + self.force_dim > self.max_state_dim:
-            raise ValueError("max_state_dim cannot hold state and force transport vector")
+        if self.proprio_dim > self.max_state_dim:
+            raise ValueError("max_state_dim cannot hold the proprioception vector")

@@ -107,6 +107,12 @@ debug_marvin_teleoperation.py
 check_dataset_integrity.py
 visualize_dataset.py
 test_*.py
+
+# The ManiFeel workspace ships its own regression tests and a real-data README plot.
+!workspaces/manifeel_usb/tests/
+!workspaces/manifeel_usb/tests/test_*.py
+!assets/data/
+!assets/data/manifeel_usb_episode_000_force.png
 demo_*.py
 
 # ==================================================

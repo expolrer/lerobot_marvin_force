@@ -1,0 +1,98 @@
+# 配置格式版本，用于训练器拒绝未知的旧配置。
+schema_version: 1
+# 训练器必须运行在此 Conda 环境中。
+environment_name: lerobot_marvin_manifeel_usb
+# 模型选择；fcact 表示 Force-conditioned ACT。
+model: fcact
+# 该实验独占的物理 GPU 编号。
+gpu_ids: "0"
+# Accelerate rendezvous 端口；与其余并行实验不得重复。
+rendezvous_port: 29610
+# 本实验启动的训练进程数；当前为单卡单进程。
+num_processes: 1
+# Accelerate 自动混合精度模式；H100 使用 bf16。
+mixed_precision: bf16
+# 训练终端日志目录。
+log_dir: /ssd/force/logs/manifeel_usb/fcact
+
+# ManiFeel USB 转换后的 LeRobot v3 数据集设置。
+dataset:
+  # 数据集逻辑标识；本地训练不会自动上传。
+  repo_id: local/manifeel_usb
+  # 56 服务器上的数据集根目录。
+  root: /ssd/force/datasets/manifeel_usb/lerobot
+  # LeRobot 数据格式版本契约。
+  codebase_version: v3.0
+  # 留出 episode 的比例，用于离线验证损失。
+  eval_split: 0.1
+  # 是否直接以 uint8 读取视频帧以减少 DataLoader 内存。
+  return_uint8: true
+  # 必须存在且形状严格匹配的观测与动作字段。
+  features:
+    # 末端位置三维与四元数四维组成的当前状态。
+    observation.state:
+      # 状态字段的数据类型。
+      dtype: float32
+      # 状态向量维度。
+      shape: [7]
+    # 右侧触觉力场按源 HWC、C-order 展平后的向量。
+    observation.tactile_force:
+      # 触觉力场字段的数据类型。
+      dtype: float32
+      # 三通道乘十行乘十四列，共 420 维。
+      shape: [420]
+    # 手腕 RGB 视频字段。
+    observation.images.wrist:
+      # LeRobot 元数据中视频字段的数据类型。
+      dtype: video
+      # 元数据按 HWC 保存的图像尺寸。
+      shape: [256, 256, 3]
+    # 六维末端增量动作，不是关节位置动作。
+    action:
+      # 动作字段的数据类型。
+      dtype: float32
+      # 三维平移增量加三维轴角增量。
+      shape: [6]
+
+# 单阶段 Force-conditioned ACT 训练任务。
+runs:
+  # 此名称同时用于日志标签与契约诊断。
+  - name: manifeel_usb_fcact
+    # 训练输出目录；续训只从该目录的 checkpoints/last 自动发现。
+    output_dir: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/fcact
+    # 每个进程的 batch；单进程时也就是全局 batch。
+    batch_size: 64
+    # 目标优化步数；续训时可增大，不能小于已有 checkpoint 步数。
+    steps: 300000
+    # DataLoader 工作进程数。
+    num_workers: 8
+    # checkpoint 保存间隔。
+    save_freq: 1000
+    # 离线验证损失计算间隔。
+    eval_steps: 5000
+    # 训练日志打印间隔。
+    log_freq: 10
+    # 数据顺序和参数初始化使用的随机种子。
+    seed: 1000
+    # 是否把 checkpoint 上传到 Hugging Face Hub。
+    push_to_hub: false
+    # 是否启用 Weights & Biases；默认关闭。
+    wandb_enable: false
+    # ACT 模型参数。
+    policy:
+      # LeRobot policy 注册名。
+      type: act
+      # 触觉力场作为独立条件并与 state 拼接进入 ACT。
+      force_feature_key: observation.tactile_force
+      # 每个训练样本预测的动作块长度。
+      chunk_size: 32
+      # 部署每次只执行一个动作，以便下一帧重新接收力反馈。
+      n_action_steps: 1
+      # 开启 ACT 时间集成时的指数权重系数。
+      temporal_ensemble_coeff: 0.01
+      # 模型内部声明的数值精度；训练 autocast 由 Accelerate 控制。
+      dtype: bfloat16
+      # 训练使用的设备类型；CUDA_VISIBLE_DEVICES 决定实际物理卡。
+      device: cuda
+      # 模型 Hub 标识，仅写入配置且默认不上传。
+      repo_id: local/manifeel_usb_fcact
