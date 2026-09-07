@@ -181,11 +181,28 @@ run_all_training() {
   local pids=() names=()
   cleanup_training() {
     local pid
-    for pid in "${pids[@]}"; do kill -TERM "${pid}" 2>/dev/null || true; done
+    # Each model is a separate session.  Killing its process group also stops
+    # Accelerate workers and DataLoader children instead of orphaning them.
+    for pid in "${pids[@]}"; do kill -TERM -- "-${pid}" 2>/dev/null || true; done
   }
-  trap cleanup_training INT TERM
+  terminate_training() {
+    cleanup_training
+    exit 143
+  }
+  command -v setsid >/dev/null 2>&1 || {
+    echo "train all requires the util-linux setsid command" >&2
+    return 2
+  }
+  local hf_offline=0
+  if [[ "${OFFLINE_MODE}" == true ]]; then hf_offline=1; fi
+  trap terminate_training INT TERM
   for model in "${models[@]}"; do
-    run_one_train "${model}" "${extra[@]}" &
+    CONDA_DEFAULT_ENV="${LEROBOT_ENV}" CONDA_PREFIX="${LEROBOT_PREFIX}" \
+      HF_HOME="${HF_CACHE}" TORCH_HOME="${TORCH_CACHE}" \
+      HF_HUB_OFFLINE="${hf_offline}" TRANSFORMERS_OFFLINE="${hf_offline}" \
+      PATH="${LEROBOT_PREFIX}/bin:${PATH}" \
+      setsid "${LEROBOT_PREFIX}/bin/python" "${WORKSPACE_ROOT}/scripts/train.py" \
+        --config "$(train_config "${model}")" "${extra[@]}" &
     pids+=("$!")
     names+=("${model}")
   done
