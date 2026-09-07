@@ -165,6 +165,12 @@ def validate_static_config(config: dict[str, Any]) -> None:
         if config["model"] == "forcevla":
             if policy.get("proprio_dim") != 7 or policy.get("force_dim") != 420:
                 raise ValueError("ForceVLA requires proprio_dim=7 and force_dim=420")
+            chunk_size = int(policy.get("chunk_size", 50))
+            if policy.get("drop_n_last_frames") != chunk_size - 1:
+                raise ValueError(
+                    "ForceVLA must drop chunk_size - 1 episode-tail anchors because PI0 "
+                    "does not mask padded action targets"
+                )
             if not run.get("pretrained_path"):
                 raise ValueError("ForceVLA fresh training requires runs[].pretrained_path")
 
@@ -489,9 +495,10 @@ def run_training(config: dict[str, Any], dataset_root: Path, *, dry_run: bool) -
             ]
             mode = f"resume from step {step}"
         else:
-            if output_dir.exists() and any(output_dir.iterdir()):
+            if output_dir.exists():
                 raise ValueError(
-                    f"Refusing fresh training in non-empty output without a complete checkpoint: {output_dir}"
+                    "Refusing fresh training because the output path already exists without a "
+                    f"complete checkpoint: {output_dir}"
                 )
             train_args = fresh_train_args(
                 config, run, dataset_root, completed_runs, dry_run=dry_run

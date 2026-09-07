@@ -478,6 +478,7 @@ def train(cfg: TrainPipelineConfig, accelerator: "Accelerator | None" = None):
     eval_dataloader = None
     if eval_dataset is not None:
         eval_ds = eval_dataset
+        eval_sampler = None
         if cfg.max_eval_samples > 0 and hasattr(eval_dataset, "hf_dataset"):
             task_arr = eval_dataset.hf_dataset.data.column("task_index").to_numpy()
             unique_tasks = sorted(set(task_arr.tolist()))
@@ -487,12 +488,25 @@ def train(cfg: TrainPipelineConfig, accelerator: "Accelerator | None" = None):
                 frames = (task_arr == t).nonzero()[0][:per_task]
                 selected.extend(frames.tolist())
             eval_ds = torch.utils.data.Subset(eval_dataset, selected)
+        elif not cfg.dataset.streaming:
+            # Match the training sampler's episode-tail contract.  Policies
+            # such as PI0/ForceVLA do not mask repeated boundary targets in
+            # their loss, so evaluating those anchors would bias held-out loss.
+            eval_sampler = EpisodeAwareSampler(
+                eval_dataset.meta.episodes["dataset_from_index"],
+                eval_dataset.meta.episodes["dataset_to_index"],
+                episode_indices_to_use=eval_dataset.episodes,
+                drop_n_last_frames=getattr(active_cfg, "drop_n_last_frames", 0),
+                shuffle=False,
+                absolute_to_relative_idx=eval_dataset.absolute_to_relative_idx,
+            )
 
         eval_collate_fn = lerobot_collate_fn if dataset.meta.has_language_columns else None
         eval_dataloader = torch.utils.data.DataLoader(
             eval_ds,
             batch_size=cfg.batch_size,
             shuffle=False,
+            sampler=eval_sampler,
             num_workers=cfg.num_workers,
             pin_memory=device.type == "cuda",
             drop_last=False,

@@ -92,6 +92,8 @@ runs:
       force_dim: 420
       # 每次推理仅执行一个动作。
       n_action_steps: 1
+      # 丢弃每个 episode 最后 49 个 anchor，避免 50 步动作块把末帧 padding 当监督。
+      drop_n_last_frames: 49
       # 主干内部精度声明。
       dtype: bfloat16
       # 是否启用梯度检查点以降低显存占用。

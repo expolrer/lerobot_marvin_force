@@ -188,6 +188,10 @@ When present, the wrapper uses that saved configuration with `--resume=true`, re
 
 RDP resumes its tokenizer until stage one is complete, then starts or resumes diffusion. W&B and Hub pushes are disabled by default.
 
+The PI0 backbone in ForceVLA predicts 50 actions and does not mask episode-boundary
+padding in its loss. The configuration therefore fixes `drop_n_last_frames=49`;
+both training and held-out loss use only anchors with a complete future chunk.
+
 The RGB-only ACT ablation uses the same dataset and ACT settings but sets `policy.force_feature_key=null`:
 
 ```bash

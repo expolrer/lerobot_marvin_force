@@ -197,6 +197,8 @@ checkpoints/last/pretrained_model/train_config.json
 
 RDP 是两阶段模型：tokenizer 未完成时只恢复第一阶段；第一阶段完成且 checkpoint 完整后才进入或恢复 diffusion。W&B 和 Hub 上传默认关闭，避免无凭据时阻塞。
 
+ForceVLA 的 PI0 主干预测 50 步动作且不会在 loss 中屏蔽 episode 边界 padding，因此配置固定 `drop_n_last_frames=49`；训练和留出集 loss 都只使用具有完整未来动作块的 anchor。
+
 视觉消融使用同一数据集和 ACT 参数，仅令 `policy.force_feature_key=null`：
 
 ```bash

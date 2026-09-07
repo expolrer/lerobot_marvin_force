@@ -1,3 +1,4 @@
+import pytest
 import torch
 from torch import nn
 
@@ -98,3 +99,14 @@ def test_prepare_state_rejects_non_finite_force():
         assert "non-finite" in str(error)
     else:
         raise AssertionError("ForceVLA accepted non-finite force")
+
+
+def test_action_tail_drop_tracks_full_pi0_chunk():
+    config = _config()
+    assert config.chunk_size == 4
+    assert config.drop_n_last_frames == 3
+
+
+def test_action_tail_drop_rejects_padded_training_targets():
+    with pytest.raises(ValueError, match="chunk_size - 1"):
+        ForceVLAConfig(chunk_size=4, n_action_steps=1, drop_n_last_frames=0)

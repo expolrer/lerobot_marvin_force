@@ -18,6 +18,20 @@ class ForceVLAConfig(PI0Config):
     proprio_dim: int = 8
     force_dim: int = 7
     n_action_steps: int = 1
+    # PI0 does not mask padded action targets in its flow-matching loss.  Drop
+    # every anchor whose full future chunk would cross an episode boundary.
+    drop_n_last_frames: int | None = None
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        expected = self.chunk_size - 1
+        if self.drop_n_last_frames is None:
+            self.drop_n_last_frames = expected
+        if self.drop_n_last_frames != expected:
+            raise ValueError(
+                "ForceVLA drop_n_last_frames must equal chunk_size - 1 "
+                f"({expected}), got {self.drop_n_last_frames}"
+            )
 
     def validate_features(self) -> None:
         super().validate_features()
