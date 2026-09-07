@@ -63,7 +63,7 @@ output_root: /ssd/force/reports/manifeel_usb/evaluation
 
 # 每个模型的 checkpoint、端口和输入契约。
 models:
-  # Force-conditioned ACT。
+  # Force-conditioned ACT 模型配置。
   fcact:
     # checkpoint 的 pretrained_model 目录；可用 CLI --checkpoint 覆盖。
     checkpoint: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/fcact/checkpoints/last/pretrained_model
@@ -93,7 +93,7 @@ models:
     use_force: true
   # 单阶段 ImplicitRDP。
   implicitrdp:
-    # ImplicitRDP checkpoint。
+    # ImplicitRDP 模型的 checkpoint 目录。
     checkpoint: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/implicitrdp/checkpoints/last/pretrained_model
     # 服务端监听端口。
     port: 5562
@@ -107,7 +107,7 @@ models:
     use_force: true
   # PI0 主干的 ForceVLA。
   forcevla:
-    # ForceVLA checkpoint。
+    # ForceVLA 模型的 checkpoint 目录。
     checkpoint: /ssd/force/outputs/lerobot_marvin_force/manifeel_usb/forcevla/checkpoints/last/pretrained_model
     # 服务端监听端口。
     port: 5563
