@@ -8,7 +8,7 @@ usage() {
 Usage:
   ./run.sh manifeel-usb env [--dry-run]
   ./run.sh manifeel-usb data {download|convert|audit|all}
-  ./run.sh manifeel-usb train {fcact|rdp|implicitrdp|forcevla|vision|all} [--dry-run]
+  ./run.sh manifeel-usb train {fcact|rdp|implicitrdp|forcevla|vision|all} [--dry-run|--smoke-test]
   ./run.sh manifeel-usb eval {serve|sim|all} {fcact|rdp|implicitrdp|forcevla|vision}
   ./run.sh env [1|2|3|4|fcact|rdp|implicitrdp|forcevla] [--dry-run]
   ./run.sh data [model] [--dry-run]

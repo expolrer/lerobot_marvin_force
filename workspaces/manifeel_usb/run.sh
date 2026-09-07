@@ -10,12 +10,13 @@ usage() {
 Usage:
   workspaces/manifeel_usb/run.sh env [--dry-run]
   workspaces/manifeel_usb/run.sh data {download|convert|audit|all}
-  workspaces/manifeel_usb/run.sh train {fcact|rdp|implicitrdp|forcevla|vision|all} [--dry-run]
+  workspaces/manifeel_usb/run.sh train {fcact|rdp|implicitrdp|forcevla|vision|all} [--dry-run|--smoke-test]
   workspaces/manifeel_usb/run.sh eval {serve|sim|all} {fcact|rdp|implicitrdp|forcevla|vision}
 
 `train all` starts the four force-conditioned models concurrently on GPU 0/1/2/3.
 The vision baseline is intentionally separate. `eval all MODEL` starts the LeRobot
 policy server, runs the official ManiFeel IsaacGym runner, and then stops the server.
+`--smoke-test` performs isolated real forward/backward/checkpoint steps under smoke/.
 EOF
 }
 

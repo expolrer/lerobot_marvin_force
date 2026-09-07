@@ -179,6 +179,14 @@ cd /ssd/force/repos/lerobot_marvin_force_manifeel_usb
 ./run.sh manifeel-usb train forcevla
 ```
 
+在正式任务前可运行隔离的真实短训；它会完成 DataLoader、前向、反向与 checkpoint，产物只写入各输出目录的 `smoke/`，不会污染正式续训点：
+
+```bash
+./run.sh manifeel-usb train all --smoke-test
+# 再将目标从 2 步提高到 3 步，可验证自动从 last checkpoint 续训
+./run.sh manifeel-usb train all --smoke-test --smoke-steps 3
+```
+
 每次启动都会查找对应输出目录中的：
 
 ```text

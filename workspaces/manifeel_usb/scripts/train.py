@@ -540,14 +540,50 @@ def run_training(config: dict[str, Any], dataset_root: Path, *, dry_run: bool) -
         completed_runs[run["name"]] = output_dir / "checkpoints" / "last" / "pretrained_model"
 
 
+def apply_smoke_overrides(config: dict[str, Any], steps: int) -> None:
+    """Isolate a short end-to-end run without touching production checkpoints."""
+
+    if steps < 1:
+        raise ValueError("smoke_steps must be positive")
+    config["log_dir"] = str(Path(config["log_dir"]).expanduser().resolve() / "smoke")
+    for run in config["runs"]:
+        output = Path(run["output_dir"]).expanduser().resolve()
+        run["output_dir"] = str(output.parent / "smoke" / output.name)
+        run["batch_size"] = 1
+        run["num_workers"] = 0
+        run["steps"] = steps
+        run["save_freq"] = 1
+        run["eval_steps"] = 0
+        run["log_freq"] = 1
+        run["push_to_hub"] = False
+        run["wandb_enable"] = False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True, help="Model training YAML")
     parser.add_argument("--gpu-ids", help="Override physical CUDA device list")
     parser.add_argument("--dry-run", action="store_true", help="Validate and print without launching")
+    parser.add_argument(
+        "--smoke-test",
+        action="store_true",
+        help="Run two real steps in an isolated smoke/ output before production training",
+    )
+    parser.add_argument(
+        "--smoke-steps",
+        type=int,
+        default=2,
+        help="Target step for --smoke-test; increasing it verifies checkpoint resume",
+    )
     args = parser.parse_args()
 
     config = load_yaml(args.config.resolve())
+    if args.smoke_test:
+        apply_smoke_overrides(config, args.smoke_steps)
+        print(
+            f"[smoke-test] isolated real training with target step {args.smoke_steps}",
+            flush=True,
+        )
     if args.gpu_ids is not None:
         config["gpu_ids"] = args.gpu_ids
     validate_static_config(config)

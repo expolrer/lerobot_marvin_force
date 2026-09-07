@@ -168,6 +168,16 @@ All runs share the same data, split, seed, and force feature. Server 56 maps one
 ./run.sh manifeel-usb train forcevla
 ```
 
+Before production, run an isolated real smoke train. It exercises the DataLoader,
+forward pass, backward pass, and checkpoint writer while keeping all artifacts
+under each output directory's `smoke/` subtree:
+
+```bash
+./run.sh manifeel-usb train all --smoke-test
+# Raising the target from two to three steps verifies automatic last-checkpoint resume.
+./run.sh manifeel-usb train all --smoke-test --smoke-steps 3
+```
+
 Each launch looks for:
 
 ```text
