@@ -54,6 +54,8 @@ ENV_DIR="$(yaml_scalar environment_prefix)"
 EXTRAS="$(yaml_scalar editable_extras)"
 ALLOW_NETWORK="$(yaml_scalar allow_network)"
 INSTALL_CURRENT_REPO="$(yaml_scalar install_current_repo)"
+WHEELHOUSE="$(yaml_scalar offline_wheelhouse)"
+INSTALL_WORKSPACE_DEPS="$(yaml_scalar install_workspace_dependencies)"
 REQUIRED_VERSION="$(yaml_scalar required_lerobot_version)"
 
 for value_name in ENV_NAME PYTHON_VERSION INSTALL_MODE ENV_DIR EXTRAS REQUIRED_VERSION; do
@@ -132,14 +134,32 @@ elif [[ "${INSTALL_CURRENT_REPO}" != false ]]; then
   exit 2
 fi
 
+if [[ "${INSTALL_WORKSPACE_DEPS}" == true ]]; then
+  [[ -d "${WHEELHOUSE}" ]] || {
+    echo "Missing offline workspace wheelhouse: ${WHEELHOUSE}" >&2
+    exit 2
+  }
+  # These are the only dependencies not supplied by the fixed LeRobot training
+  # archive: Zarr source ingestion, report plotting, tests, and the ZMQ bridge.
+  run "${ENV_DIR}/bin/python" -m pip install --disable-pip-version-check \
+    --no-index --find-links "${WHEELHOUSE}" \
+    "zarr>=2.18.7,<3" "matplotlib>=3.10.3,<4" "pytest>=8.4,<9" "pyzmq>=26.2.1,<28"
+elif [[ "${INSTALL_WORKSPACE_DEPS}" != false ]]; then
+  echo "install_workspace_dependencies must be true or false" >&2
+  exit 2
+fi
+
 if [[ ${DRY_RUN} -eq 0 ]]; then
   "${ENV_DIR}/bin/python" - "${REQUIRED_VERSION}" "${PYTHON_VERSION}" <<'PY'
 import importlib.util
 import sys
 
 import lerobot
+import matplotlib
+import pytest
 import torch
 import yaml
+import zarr
 import zmq
 
 required = sys.argv[1]
@@ -155,7 +175,8 @@ if importlib.util.find_spec("accelerate") is None:
     raise SystemExit("accelerate is missing")
 print(
     f"validated python={sys.version_info.major}.{sys.version_info.minor} "
-    f"lerobot={actual} torch={torch.__version__} pyzmq={zmq.__version__}"
+    f"lerobot={actual} torch={torch.__version__} zarr={zarr.__version__} "
+    f"matplotlib={matplotlib.__version__} pytest={pytest.__version__} pyzmq={zmq.__version__}"
 )
 PY
 fi

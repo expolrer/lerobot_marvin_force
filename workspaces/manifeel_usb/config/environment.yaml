@@ -18,6 +18,10 @@ editable_extras: "training,pi,pyzmq-dep"
 allow_network: false
 # 是否以 --no-deps 将当前分支重新注册到离线环境，确保运行的正是此 checkout。
 install_current_repo: true
+# 6 服务器预先构建并传入 56 服务器的 Python 3.12 离线 wheel 目录。
+offline_wheelhouse: /ssd/force/transfer/manifeel_usb_wheelhouse
+# 是否安装数据转换、曲线绘制、测试和 ZMQ 服务所需的最小附加依赖。
+install_workspace_dependencies: true
 # 56 服务器上共享的预训练权重与下载缓存根目录。
 cache_root: /ssd/force/cache
 # Hugging Face 模型与 tokenizer 缓存目录。
